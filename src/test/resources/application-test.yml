@@ -1,0 +1,19 @@
+spring:
+  main:
+    allow-bean-definition-overriding: true
+  flyway:
+    locations: classpath:db/schema   # # In tests, only create tables; tests insert their own rows
+
+# Injects datasource props from Testcontainers dynamically,
+# so no fixed URL/creds here.
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+logging:
+  level:
+    org.hibernate.SQL: warn     # keep test logs tidy
+    org.testcontainers: info

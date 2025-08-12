@@ -5,7 +5,7 @@ server:
 # Spring & Data/JPA configuration
 spring:
   datasource:
-    # Local MySQL running via Docker compose
+    # Local MySQL running via Docker compose (maps 3307 ? 3307)
     url: jdbc:mysql://localhost:3307/learning?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
     username: app      # from docker-compose.yml
     password: app      # from docker-compose.yml
@@ -17,14 +17,30 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.MySQL8Dialect  # SQL dialect for MySQL 8
 
-  # Flyway migrations
+  # === Flyway migrations ===
   flyway:
     enabled: true
-    locations: classpath:db/migration   # Looks under src/main/resources/db/migration
+    locations: classpath:db/schema,classpath:db/seed-dev   # # Run schema + dev seed when running the app normally
 
-# Actuator (health, info, etc.)
+# === Actuator (health, info, etc.) ===
 management:
   endpoints:
     web:
       exposure:
         include: health   # Expose /actuator/health for quick liveness checks
+
+# --- Optional: you can add these later when needed ---
+# security:
+#   jwt:
+#     issuer: "learning-platform"
+#     accessTokenTtlMinutes: 15
+#     secret: ${JWT_SECRET:dev-secret-change}  # use env var in real deployments
+#
+# stripe:
+#   apiKey: ${STRIPE_API_KEY:}
+#   webhookSecret: ${STRIPE_WEBHOOK_SECRET:}
+#
+# spring:
+#   datasource:
+#     # Example for using a different port if 3306 conflicts:
+#     url: jdbc:mysql://localhost:3307/learning?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
