@@ -1,0 +1,30 @@
+# Server settings
+server:
+  port: 8080           # Spring Boot will listen here in dev
+
+# Spring & Data/JPA configuration
+spring:
+  datasource:
+    # Local MySQL running via Docker compose
+    url: jdbc:mysql://localhost:3307/learning?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: app      # from docker-compose.yml
+    password: app      # from docker-compose.yml
+
+  jpa:
+    hibernate:
+      ddl-auto: validate   # Do NOT auto-create/alter tables; use Flyway instead
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect  # SQL dialect for MySQL 8
+
+  # Flyway migrations
+  flyway:
+    enabled: true
+    locations: classpath:db/migration   # Looks under src/main/resources/db/migration
+
+# Actuator (health, info, etc.)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health   # Expose /actuator/health for quick liveness checks
