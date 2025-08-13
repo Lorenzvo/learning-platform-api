@@ -59,12 +59,16 @@ class CourseRepositoryTest {
         Course c1 = new Course();
         c1.setSlug("java-basics");
         c1.setTitle("Java Basics");
+        c1.setDescription("Intro to Java");
+        c1.setLevel("BEGINNER");
         c1.setPriceCents(2999);
         c1.setIsActive(true);
 
         Course c2 = new Course();
         c2.setSlug("spring-boot-fundamentals");
         c2.setTitle("Spring Boot Fundamentals");
+        c2.setDescription("Spring Boot REST");
+        c2.setLevel("BEGINNER");
         c2.setPriceCents(4999);
         c2.setIsActive(true);
 
@@ -85,5 +89,23 @@ class CourseRepositoryTest {
     void findBySlugAndIsActiveTrue_404() {
         var missing = repo.findBySlugAndIsActiveTrue("nope");
         assertThat(missing).isEmpty();
+    }
+
+    /**
+     * NEW: Test custom search method with filters and pagination.
+     * Verifies DB-level filtering and paging for GET /api/courses.
+     */
+    @Test
+    @DisplayName("search() returns filtered and paged results")
+    void search_returns_filtered_and_paged() {
+        // Act: search for 'java' in title, level BEGINNER, published true
+        org.springframework.data.domain.Page<Course> page = repo.search(
+            "java", "BEGINNER", true,
+            org.springframework.data.domain.PageRequest.of(0, 10)
+        );
+
+        // Assert: only c1 matches
+        assertThat(page.getTotalElements()).isEqualTo(1);
+        assertThat(page.getContent().get(0).getSlug()).isEqualTo("java-basics");
     }
 }

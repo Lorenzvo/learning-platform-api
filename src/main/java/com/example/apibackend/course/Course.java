@@ -56,4 +56,13 @@ public class Course {
     )
     private Instant updatedAt;
 
+    /**
+     * Course difficulty/target audience (e.g., BEGINNER, INTERMEDIATE, ADVANCED).
+     * Added in V3 migration. Supports API filtering and display.
+     */
+    @Setter
+    @Getter
+    @Column(name = "level")
+    private String level;
+
 }

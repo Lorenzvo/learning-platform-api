@@ -59,6 +59,8 @@ class CourseControllerTest {
         Course course = new Course();
         course.setSlug("spring-boot-fundamentals");
         course.setTitle("Spring Boot Fundamentals");
+        course.setDescription("Spring Boot REST");
+        course.setLevel("BEGINNER");
         course.setPriceCents(4999);
         course.setIsActive(true);
 
@@ -73,5 +75,36 @@ class CourseControllerTest {
 
         mvc.perform(get("/api/courses/nope"))
                 .andExpect(status().isNotFound());
+    }
+
+    /**
+     * NEW: Test GET /api/courses with pagination and filters.
+     * Verifies param binding, default values, and DTO mapping.
+     */
+    @Test
+    void searchCourses_paginationAndFilters_ok() throws Exception {
+        Course course = new Course();
+        course.setSlug("java-basics");
+        course.setTitle("Java Basics");
+        course.setDescription("Intro to Java");
+        course.setLevel("BEGINNER");
+        course.setPriceCents(4999);
+        course.setIsActive(true);
+
+        org.springframework.data.domain.Page<Course> page = new org.springframework.data.domain.PageImpl<>(List.of(course));
+        Mockito.when(repo.search(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any())).thenReturn(page);
+
+        // Act & Assert: call endpoint with params and check response shape
+        mvc.perform(get("/api/courses")
+                .param("page", "0")
+                .param("size", "5")
+                .param("q", "java")
+                .param("level", "BEGINNER")
+                .param("published", "true")
+                .accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content[0].slug").value("java-basics"))
+            .andExpect(jsonPath("$.content[0].title").value("Java Basics"))
+            .andExpect(jsonPath("$.content[0].level").value("BEGINNER"));
     }
 }

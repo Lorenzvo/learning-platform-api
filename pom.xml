@@ -157,6 +157,18 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-maven-plugin</artifactId>
+                <version>11.7.2</version>
+                <configuration>
+                    <!-- Specify custom migration locations -->
+                    <locations>
+                        <location>classpath:db/schema</location>
+                        <location>classpath:db/seed-dev</location>
+                    </locations>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 
