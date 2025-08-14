@@ -63,7 +63,7 @@ public class DevEnrollmentController {
         Enrollment enrollment = new Enrollment();
         enrollment.setUser(userOpt.get());
         enrollment.setCourse(courseOpt.get());
-        enrollment.setStatus(Enrollment.Status.ACTIVE);
+        enrollment.setStatus(Enrollment.EnrollmentStatus.ACTIVE);
     //  enrollment.setEnrolledAt(Instant.now());
         enrollmentRepo.save(enrollment);
         return ResponseEntity.status(201).body(new DevEnrollmentDto(enrollment));
@@ -83,7 +83,6 @@ public class DevEnrollmentController {
             this.userId = e.getUser().getId();
             this.courseId = e.getCourse().getId();
             this.status = e.getStatus().toString();
-      //      this.enrolledAt = e.getEnrolledAt();
         }
     }
 

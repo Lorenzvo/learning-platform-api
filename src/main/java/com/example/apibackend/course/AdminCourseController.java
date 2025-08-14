@@ -1,5 +1,8 @@
 package com.example.apibackend.course;
 
+import com.example.apibackend.enrollment.EnrollmentRepository;
+import com.example.apibackend.payment.Payment;
+import com.example.apibackend.payment.PaymentRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -21,8 +24,13 @@ import jakarta.validation.constraints.Size;
 @PreAuthorize("hasRole('ADMIN')") // Enforce ROLE_ADMIN for all endpoints in this controller
 public class AdminCourseController {
     private final CourseRepository courseRepo;
-    public AdminCourseController(CourseRepository courseRepo) {
+    private final EnrollmentRepository enrollmentRepo;
+    private final PaymentRepository paymentRepo;
+
+    public AdminCourseController(CourseRepository courseRepo, EnrollmentRepository enrollmentRepo, PaymentRepository paymentRepo) {
         this.courseRepo = courseRepo;
+        this.enrollmentRepo = enrollmentRepo;
+        this.paymentRepo = paymentRepo;
     }
 
     @GetMapping
@@ -53,6 +61,20 @@ public class AdminCourseController {
         return ResponseEntity.status(201).body(new CourseDetailDto(course));
     }
 
+    @GetMapping("/metrics/summary")
+    public ResponseEntity<MetricsSummary> getMetricsSummary() {
+        // These queries are lightweight for small/medium datasets, but may need caching for large scale.
+        long totalCourses = courseRepo.count();
+        long totalEnrollments = enrollmentRepo.count();
+        // Sum revenue from successful payments; if payments table not populated, return 0
+        Double revenueUsd = paymentRepo.sumAmountByStatus(Payment.PaymentStatus.SUCCESS);
+        if (revenueUsd == null) revenueUsd = 0.0;
+        // Convert cents to dollars for API response
+        revenueUsd = revenueUsd / 100.0;
+        MetricsSummary summary = new MetricsSummary(totalCourses, totalEnrollments, revenueUsd);
+        return ResponseEntity.ok(summary);
+    }
+
     /**
      * DTO for course creation. Validation groups can be added for more granular control.
      */
@@ -81,5 +103,11 @@ public class AdminCourseController {
         public String thumbnailUrl;
         @NotNull
         public Boolean published;
+    }
+
+    /**
+         * Simple DTO for metrics summary response
+         */
+        public record MetricsSummary(long totalCourses, long totalEnrollments, double revenueUsd) {
     }
 }

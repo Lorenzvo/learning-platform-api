@@ -43,8 +43,8 @@ public class Course {
     private Integer priceCents; // Store money in cents
 
     @Setter
-    @Column(nullable = false, length = 3, columnDefinition = "char(3) default 'USD'")
     @Pattern(regexp = "^[A-Z]{3}$")
+    @Column(nullable = false, length = 3, columnDefinition = "char(3) default 'USD'")
     private String currency; // ISO 4217 currency code, default to USD
 
     @Setter

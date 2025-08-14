@@ -20,6 +20,8 @@ import java.time.Instant;
         uniqueConstraints = @UniqueConstraint(name="uq_enroll", columnNames={"user_id","course_id"})
 )
 public class Enrollment {
+    public static enum EnrollmentStatus { PENDING, ACTIVE, CANCELED }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -48,9 +50,7 @@ public class Enrollment {
     // Mirror the ENUM('PENDING','ACTIVE','CANCELED') from SQL
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, columnDefinition = "enum('PENDING','ACTIVE','CANCELED')")
-    private Status status = Status.PENDING;
-
-    public enum Status { PENDING, ACTIVE, CANCELED }
+    private EnrollmentStatus status = EnrollmentStatus.PENDING;
 
     @Column(
             name = "created_at",
