@@ -4,6 +4,7 @@ import com.example.apibackend.lesson.Lesson;
 import com.example.apibackend.lesson.LessonRepository;
 import com.example.apibackend.module.Module;
 import com.example.apibackend.module.ModuleRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

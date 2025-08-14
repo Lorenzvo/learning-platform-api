@@ -4,6 +4,7 @@ import com.example.apibackend.course.Course;
 import com.example.apibackend.course.CourseRepository;
 import com.example.apibackend.user.User;
 import com.example.apibackend.user.UserRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,8 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-
-import java.util.concurrent.ForkJoinPool;
+import org.springframework.transaction.annotation.Transactional;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -81,6 +81,13 @@ class DevEnrollmentControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"userId\":1,\"courseId\":1}"))
                 .andExpect(status().isConflict());
+    }
+
+    @AfterEach
+    void cleanup() {
+        enrollmentRepo.deleteAll();
+        userRepo.deleteAll();
+        courseRepo.deleteAll();
     }
 
 //    @Test
