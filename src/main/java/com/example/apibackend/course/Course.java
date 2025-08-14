@@ -29,6 +29,9 @@ public class Course {
     @Column(nullable = false, length = 255)
     private String title;
 
+    @Column(name = "short_description", length = 280)
+    private String shortDescription;
+
     @Setter
     @Column(columnDefinition = "TEXT")
     private String description; // Longer text
@@ -61,8 +64,20 @@ public class Course {
      * Added in V3 migration. Supports API filtering and display.
      */
     @Setter
-    @Getter
     @Column(name = "level")
     private String level;
 
+    @Setter
+    @Column(name = "thumbnail_url", length = 255)
+    private String thumbnailUrl;
+
+    // Fills shortDescription with long description if not set, compatible with legacy code as description was implemented first
+    @PrePersist @PreUpdate
+    private void ensureShortDescription() {
+        if ((shortDescription == null || shortDescription.isBlank()) && description != null) {
+            // naive teaser: strip newlines and hard cut at ~180 chars
+            String plain = description.replaceAll("\\s+", " ").trim();
+            shortDescription = plain.length() <= 180 ? plain : plain.substring(0, 177) + "...";
+        }
+    }
 }

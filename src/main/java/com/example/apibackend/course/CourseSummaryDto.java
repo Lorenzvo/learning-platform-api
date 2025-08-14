@@ -1,5 +1,8 @@
-// ...existing code...
 package com.example.apibackend.course;
+
+import jakarta.persistence.Column;
+import lombok.Setter;
+import java.util.List;
 
 /**
  * DTO for paged course summaries in API responses.
@@ -14,5 +17,3 @@ public record CourseSummaryDto(
     String level,
     Boolean published
 ) {}
-// ...existing code...
-
