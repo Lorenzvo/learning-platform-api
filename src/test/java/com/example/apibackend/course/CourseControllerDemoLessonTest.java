@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional // Ensures rollback after each test
+
 class CourseControllerDemoLessonTest {
     @Autowired
     private MockMvc mockMvc;
@@ -29,6 +31,8 @@ class CourseControllerDemoLessonTest {
     private LessonRepository lessonRepo;
     @Autowired
     private CourseRepository courseRepo;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private Long courseId;
     private Long demoLessonId;
@@ -44,6 +48,9 @@ class CourseControllerDemoLessonTest {
         System.out.println("Modules after delete: " + moduleRepo.count());
         System.out.println("Courses after delete: " + courseRepo.count());
 
+        jdbcTemplate.execute("ALTER TABLE lessons AUTO_INCREMENT = 1");
+        jdbcTemplate.execute("ALTER TABLE modules AUTO_INCREMENT = 1");
+        jdbcTemplate.execute("ALTER TABLE courses AUTO_INCREMENT = 1");
         // Seed a course
         Course course = new Course();
         course.setTitle("Demo Course");
@@ -120,11 +127,13 @@ class CourseControllerDemoLessonTest {
         courseRepo.save(otherCourse);
 
         Module otherModule = new Module();
+        otherModule.setCourse(otherCourse);
         otherModule.setTitle("Other Module");
         otherModule.setPosition(1);
         moduleRepo.save(otherModule);
 
         Lesson otherLesson = new Lesson();
+        otherLesson.setModule(otherModule);
         otherLesson.setTitle("Other Demo Lesson");
         otherLesson.setType(com.example.apibackend.lesson.LessonType.VIDEO);
         otherLesson.setDurationSeconds(60);

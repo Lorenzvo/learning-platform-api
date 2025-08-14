@@ -156,11 +156,12 @@ public class CourseController {
     public ResponseEntity<?> getDemoLessonToken(@PathVariable Long courseId, @PathVariable Long lessonId) {
         // Find lesson and verify it belongs to the course
         Lesson lesson = lessonRepo.findById(lessonId).orElse(null);
+        // Validate lesson existence and association with a valid module/course
         if (lesson == null) {
             return ResponseEntity.notFound().build();
         }
-        Module module = moduleRepo.findById(lesson.getId()).orElse(null);
-        if (module == null || !courseId.equals(module.getId())) {
+        Module module = lesson.getModule();
+        if (module == null || module.getCourse() == null || !courseId.equals(module.getCourse().getId())) {
             return ResponseEntity.notFound().build();
         }
         if (!lesson.isDemo()) {
