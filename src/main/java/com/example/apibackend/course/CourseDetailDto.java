@@ -12,4 +12,17 @@ public record CourseDetailDto(
         String thumbnailUrl,
         boolean published,
         List<ModuleDto> modules
-) {}
+) {
+    public CourseDetailDto(Course course) {
+        this(
+            course.getTitle(),
+            course.getPriceCents(),
+            course.getSlug(),
+            course.getLevel(),
+            course.getDescription(),
+            course.getThumbnailUrl(),
+            Boolean.TRUE.equals(course.getIsActive()),
+            List.of() // No modules for admin create response
+        );
+    }
+}

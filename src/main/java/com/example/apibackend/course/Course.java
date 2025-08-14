@@ -1,6 +1,7 @@
 package com.example.apibackend.course;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -29,6 +30,7 @@ public class Course {
     @Column(nullable = false, length = 255)
     private String title;
 
+    @Setter
     @Column(name = "short_description", length = 280)
     private String shortDescription;
 
@@ -39,6 +41,11 @@ public class Course {
     @Setter
     @Column(name = "price_cents", nullable = false)
     private Integer priceCents; // Store money in cents
+
+    @Setter
+    @Column(nullable = false, length = 3, columnDefinition = "char(3) default 'USD'")
+    @Pattern(regexp = "^[A-Z]{3}$")
+    private String currency; // ISO 4217 currency code, default to USD
 
     @Setter
     @Column(name = "is_active", nullable = false)
@@ -63,6 +70,7 @@ public class Course {
      * Course difficulty/target audience (e.g., BEGINNER, INTERMEDIATE, ADVANCED).
      * Added in V3 migration. Supports API filtering and display.
      */
+
     @Setter
     @Column(name = "level")
     private String level;
@@ -72,12 +80,14 @@ public class Course {
     private String thumbnailUrl;
 
     // Fills shortDescription with long description if not set, compatible with legacy code as description was implemented first
+    // Converts currency to uppercase before saving
     @PrePersist @PreUpdate
-    private void ensureShortDescription() {
+    private void normalize() {
         if ((shortDescription == null || shortDescription.isBlank()) && description != null) {
             // naive teaser: strip newlines and hard cut at ~180 chars
             String plain = description.replaceAll("\\s+", " ").trim();
             shortDescription = plain.length() <= 180 ? plain : plain.substring(0, 177) + "...";
         }
+        if (currency != null) currency = currency.toUpperCase();
     }
 }

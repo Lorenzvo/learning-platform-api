@@ -23,8 +23,8 @@ public class SecurityConfig {
                 // CSRF mainly blocks state-changing requests from browsers; leave it disabled for API dev.
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // health should be open
-                        .requestMatchers("/actuator/health").permitAll()
+                        // open up actuator endpoints for health checks/metrics
+                        .requestMatchers("/actuator/**").permitAll()
                         // open public catalog endpoints
                         .requestMatchers(HttpMethod.GET, "/api/courses/**").permitAll()
                         // open demo lesson token endpoint for GET

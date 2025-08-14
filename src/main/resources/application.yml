@@ -27,9 +27,14 @@ management:
   endpoints:
     web:
       exposure:
-        include: health   # Expose /actuator/health for quick liveness checks
+        include: health, info   # Expose /actuator/health and /actuator/info for quick liveness checks
 
-# --- Optional: you can add these later when needed ---
+info:
+  app:
+    name: "Learning Platform API"
+    build: "1.0.0"
+
+# --- Optional: can add these later when needed ---
 # security:
 #   jwt:
 #     issuer: "learning-platform"

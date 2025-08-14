@@ -1,5 +1,7 @@
 package com.example.apibackend.course;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 
@@ -30,4 +32,6 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
         @org.springframework.data.repository.query.Param("published") Boolean published,
         org.springframework.data.domain.Pageable pageable
     );
+
+    boolean existsBySlug(@NotBlank @Size(max = 255) String slug);
 }
