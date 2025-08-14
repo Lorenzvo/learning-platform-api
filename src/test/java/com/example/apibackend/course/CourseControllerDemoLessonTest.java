@@ -44,9 +44,6 @@ class CourseControllerDemoLessonTest {
         lessonRepo.deleteAll();
         moduleRepo.deleteAll();
         courseRepo.deleteAll();
-        System.out.println("Lessons after delete: " + lessonRepo.count());
-        System.out.println("Modules after delete: " + moduleRepo.count());
-        System.out.println("Courses after delete: " + courseRepo.count());
 
         jdbcTemplate.execute("ALTER TABLE lessons AUTO_INCREMENT = 1");
         jdbcTemplate.execute("ALTER TABLE modules AUTO_INCREMENT = 1");
@@ -60,7 +57,6 @@ class CourseControllerDemoLessonTest {
         course.setPriceCents(1000);
         courseRepo.save(course);
         courseId = course.getId();
-        System.out.println("Seeded courseId: " + courseId);
 
         // Seed a module
         Module module = new Module();
@@ -69,7 +65,6 @@ class CourseControllerDemoLessonTest {
         module.setPosition(1);
         moduleRepo.save(module);
         Long moduleId = module.getId();
-        System.out.println("Seeded moduleId: " + moduleId + ", module.courseId: " + (module.getCourse() != null ? module.getCourse().getId() : null));
 
         // Seed a demo lesson
         Lesson demoLesson = new Lesson();
