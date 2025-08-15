@@ -15,6 +15,9 @@ public interface LessonRepository extends JpaRepository<Lesson, Long> {
     List<Lesson> findByModuleIdOrderByIdAsc(Long moduleId);
     // If adding lesson.position for UI, switch to OrderByPositionAsc
 
+    // Show lessons inside a module, ordered by position for UI
+    List<Lesson> findByModuleIdOrderByPositionAsc(Long moduleId);
+
     // Cross-entity property path: all lessons across a course (paged)
     Page<Lesson> findByModuleCourseId(Long courseId, Pageable pageable);
 

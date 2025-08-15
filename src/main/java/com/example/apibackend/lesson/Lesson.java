@@ -45,16 +45,21 @@ public class Lesson {
     @Column(name = "duration_seconds")
     private Integer durationSeconds;
 
-    // Whether this is a free preview/demo in the course
+    // Demo/preview flag for marketing/free trial
     @Setter
     @Column(name = "is_demo", nullable = false)
-    private boolean demo;
+    private boolean isDemo;
+
+    // New: position for ordering lessons within a module
+    @Setter
+    @Column(nullable = false)
+    private int position;
 
     // --- boilerplate ---
     public Lesson() {}
     public Lesson(Module module, String title, LessonType type, String contentUrl,
-                  Integer durationSeconds, boolean demo) {
+                  Integer durationSeconds, boolean demo, int position) {
         this.module = module; this.title = title; this.type = type;
-        this.contentUrl = contentUrl; this.durationSeconds = durationSeconds; this.demo = demo;
+        this.contentUrl = contentUrl; this.durationSeconds = durationSeconds; this.isDemo = demo; this.position = position;
     }
 }
