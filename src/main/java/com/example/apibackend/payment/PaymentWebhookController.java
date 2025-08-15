@@ -4,6 +4,7 @@ import com.example.apibackend.enrollment.Enrollment;
 import com.example.apibackend.enrollment.EnrollmentRepository;
 import com.example.apibackend.user.User;
 import com.example.apibackend.course.Course;
+import com.example.apibackend.email.EmailService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -22,6 +23,7 @@ import java.util.Optional;
 public class PaymentWebhookController {
     private final PaymentRepository paymentRepo;
     private final EnrollmentRepository enrollmentRepo;
+    private final EmailService emailService;
     private static final Logger log = LoggerFactory.getLogger(PaymentWebhookController.class);
 
     // Shared secret for signature verification (stub for now)
@@ -72,7 +74,6 @@ public class PaymentWebhookController {
             payment.setStatus(Payment.PaymentStatus.SUCCESS);
             payment.setGatewayTxnId(payload.gatewayTxnId);
             paymentRepo.save(payment);
-            // Never trust client calls for enrollment: only create on verified payment webhook
             User user = payment.getUser();
             Course course = payment.getCourse();
             boolean alreadyEnrolled = enrollmentRepo.existsByUserIdAndCourseId(user.getId(), course.getId());
@@ -82,7 +83,11 @@ public class PaymentWebhookController {
                 enrollment.setCourse(course);
                 enrollment.setStatus(Enrollment.EnrollmentStatus.ACTIVE);
                 enrollmentRepo.save(enrollment);
+                // Send enrollment confirmation email (stub)
+                emailService.sendEnrollmentConfirmation(user, course);
             }
+            // Always send payment receipt email (stub)
+            emailService.sendPaymentReceipt(user, course, payment);
             log.info("Payment marked SUCCESS and enrollment created if needed");
             return ResponseEntity.ok("Payment processed and enrollment updated");
         } else if ("FAILED".equalsIgnoreCase(payload.status)) {

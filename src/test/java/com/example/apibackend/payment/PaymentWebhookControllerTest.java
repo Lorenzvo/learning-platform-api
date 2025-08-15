@@ -1,6 +1,7 @@
 package com.example.apibackend.payment;
 
 import com.example.apibackend.course.Course;
+import com.example.apibackend.email.EmailService;
 import com.example.apibackend.enrollment.Enrollment;
 import com.example.apibackend.enrollment.EnrollmentRepository;
 import com.example.apibackend.user.User;
@@ -33,6 +34,8 @@ class PaymentWebhookControllerTest {
     private PaymentRepository paymentRepo;
     @MockitoBean
     private EnrollmentRepository enrollmentRepo;
+    @MockitoBean
+    private EmailService emailService;
 
     private Payment payment;
     private User user;
