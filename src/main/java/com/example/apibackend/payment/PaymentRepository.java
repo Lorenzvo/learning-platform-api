@@ -26,4 +26,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     @Query("select coalesce(sum(p.amountCents),0) from Payment p where p.status = :status")
     Double sumAmountByStatus(@Param("status") PaymentStatus status);
+
+    // Finds the most recent PENDING payment for a user and course (idempotency for rapid retries)
+    Optional<Payment> findTopByUserIdAndCourseIdAndStatusOrderByCreatedAtDesc(Long userId, Long courseId, PaymentStatus status);
 }
