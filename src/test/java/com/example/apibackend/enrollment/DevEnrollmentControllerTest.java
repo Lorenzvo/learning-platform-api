@@ -12,6 +12,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,10 +55,12 @@ class DevEnrollmentControllerTest {
         course.setSlug("test-course");
         course.setTitle("Test Course");
         course.setPriceCents(1000);
+        course.setCurrency("USD");
         course.setIsActive(true);
         courseRepo.save(course);
     }
 
+    @WithMockUser(username = "admin", roles = {"ADMIN"})
     @Test
     void createEnrollment_success() throws Exception {
         mockMvc.perform(post("/api/dev/enrollments")
@@ -69,6 +72,7 @@ class DevEnrollmentControllerTest {
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
     }
 
+    @WithMockUser(username = "admin", roles = {"ADMIN"})
     @Test
     void createEnrollment_conflict() throws Exception {
         // First request creates enrollment

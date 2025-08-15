@@ -65,6 +65,7 @@ class CourseApiIT {
         c1.setTitle("Java Basics");
         c1.setDescription("Intro");
         c1.setPriceCents(2999);
+        c1.setCurrency("USD");
         c1.setIsActive(true);
 
         var c2 = new com.example.apibackend.course.Course();
@@ -72,6 +73,7 @@ class CourseApiIT {
         c2.setTitle("Spring Boot Fundamentals");
         c2.setDescription("REST, JPA");
         c2.setPriceCents(4999);
+        c2.setCurrency("USD");
         c2.setIsActive(true);
 
         courseRepo.saveAll(java.util.List.of(c1, c2));

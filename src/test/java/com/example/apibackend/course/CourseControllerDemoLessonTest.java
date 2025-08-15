@@ -56,6 +56,7 @@ class CourseControllerDemoLessonTest {
         course.setIsActive(true);
         course.setLevel("beginner");
         course.setPriceCents(1000);
+        course.setCurrency("USD");
         courseRepo.save(course);
         courseId = course.getId();
 
@@ -120,6 +121,7 @@ class CourseControllerDemoLessonTest {
         otherCourse.setIsActive(true);
         otherCourse.setLevel("beginner");
         otherCourse.setPriceCents(1000);
+        otherCourse.setCurrency("USD");
         courseRepo.save(otherCourse);
 
         Module otherModule = new Module();

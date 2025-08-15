@@ -58,6 +58,7 @@ class SecurityConfigTest {
         course.setIsActive(true);
         course.setLevel("beginner");
         course.setPriceCents(1000);
+        course.setCurrency("USD");
         courseRepo.save(course);
 
         // Seed a module

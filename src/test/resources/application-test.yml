@@ -11,9 +11,10 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: '*'  # Expose all actuator endpoints
 
 logging:
   level:
     org.hibernate.SQL: warn     # keep test logs tidy
     org.testcontainers: info
+

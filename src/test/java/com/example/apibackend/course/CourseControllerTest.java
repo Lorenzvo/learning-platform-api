@@ -1,5 +1,7 @@
 package com.example.apibackend.course;
 
+import com.example.apibackend.lesson.LessonRepository;
+import com.example.apibackend.module.ModuleRepository;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +37,14 @@ class CourseControllerTest {
     @MockitoBean
     CourseRepository repo;
 
+    @MockitoBean
+    // needed to inject this dependency because of some error with spring trying to load all course dependencies
+    private ModuleRepository moduleRepo;
+
+    @MockitoBean
+    private LessonRepository lessonRepo;
+
+
     @Test
     void list_returns_active_courses() throws Exception {
         // Arrange: stub repository response
@@ -43,6 +53,7 @@ class CourseControllerTest {
         course.setSlug("java-basics");
         course.setTitle("Java Basics");
         course.setPriceCents(2999);
+        course.setCurrency("USD");
         course.setIsActive(true);
 
         // stub the repository the controller calls
@@ -89,6 +100,7 @@ class CourseControllerTest {
         course.setDescription("Intro to Java");
         course.setLevel("BEGINNER");
         course.setPriceCents(4999);
+        course.setCurrency("USD");
         course.setIsActive(true);
 
         org.springframework.data.domain.Page<Course> page = new org.springframework.data.domain.PageImpl<>(List.of(course));

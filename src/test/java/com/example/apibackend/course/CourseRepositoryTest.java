@@ -1,5 +1,6 @@
 package com.example.apibackend.course;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -62,7 +63,9 @@ class CourseRepositoryTest {
         c1.setDescription("Intro to Java");
         c1.setLevel("BEGINNER");
         c1.setPriceCents(2999);
+        c1.setCurrency("USD");
         c1.setIsActive(true);
+        repo.save(c1);
 
         Course c2 = new Course();
         c2.setSlug("spring-boot-fundamentals");
@@ -70,8 +73,8 @@ class CourseRepositoryTest {
         c2.setDescription("Spring Boot REST");
         c2.setLevel("BEGINNER");
         c2.setPriceCents(4999);
+        c2.setCurrency("USD");
         c2.setIsActive(true);
-
         repo.save(c1);
         repo.save(c2);
     }
@@ -107,5 +110,10 @@ class CourseRepositoryTest {
         // Assert: only c1 matches
         assertThat(page.getTotalElements()).isEqualTo(1);
         assertThat(page.getContent().get(0).getSlug()).isEqualTo("java-basics");
+    }
+
+    @AfterEach
+    void cleanup() {
+        repo.deleteAll();
     }
 }

@@ -35,11 +35,11 @@ info:
     build: "1.0.0"
 
 # --- Optional: can add these later when needed ---
-# security:
-#   jwt:
-#     issuer: "learning-platform"
-#     accessTokenTtlMinutes: 15
-#     secret: ${JWT_SECRET:dev-secret-change}  # use env var in real deployments
+security:
+  jwt:
+    secret: "CHANGE_ME_TO_A_SECURE_RANDOM_SECRET_FOR_PRODUCTION" # TODO: Replace with a secure random value in production
+    issuer: "learning-platform"
+    accessTokenTtlMinutes: 15
 #
 # stripe:
 #   apiKey: ${STRIPE_API_KEY:}
