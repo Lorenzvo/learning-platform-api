@@ -4,6 +4,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -39,6 +44,47 @@ public class AdminEnrollmentController {
     }
 
     /**
+     * GET /api/admin/reports/enrollments.csv?from=YYYY-MM-DD&to=YYYY-MM-DD
+     * Streams CSV for BI/reporting. Streaming avoids memory pressure for large datasets.
+     * BI tooling (Excel, Tableau, etc.) can ingest these files directly.
+     */
+    @GetMapping("/reports/enrollments.csv")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<StreamingResponseBody> exportEnrollmentsCsv(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        // Convert LocalDate to Instant for filtering
+        Date fromDate = Date.from(from.atStartOfDay().toInstant(ZoneOffset.UTC));
+        Date toDate = Date.from(to.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC));
+        // StreamingResponseBody writes directly to output stream
+        StreamingResponseBody stream = out -> {
+            // CSV header
+            out.write("enrollmentId,userEmail,courseSlug,enrolledAt,status\n".getBytes());
+            // Stream enrollments in date range
+            enrollmentRepo.findAll().stream()
+                .filter(e -> e.getCreatedAt() != null &&
+                    !e.getCreatedAt().isBefore(from.atStartOfDay().toInstant(ZoneOffset.UTC)) &&
+                    e.getCreatedAt().isBefore(to.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC)))
+                .forEach(e -> {
+                    try {
+                        String line = String.format("%d,%s,%s,%s,%s\n",
+                                e.getId(),
+                                e.getUser().getEmail(),
+                                e.getCourse().getSlug(),
+                                e.getCreatedAt(),
+                                e.getStatus().name());
+                        out.write(line.getBytes());
+                    } catch (Exception ex) { /* log or ignore */ }
+                });
+        };
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=enrollments.csv")
+                .header("Content-Type", "text/csv")
+                .body(stream);
+    }
+
+    /**
      * DTO for enrollment response
      * Includes userId for admin visibility.
      */
@@ -55,4 +101,3 @@ public class AdminEnrollmentController {
         }
     }
 }
-
