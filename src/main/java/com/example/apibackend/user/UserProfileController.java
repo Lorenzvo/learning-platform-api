@@ -33,16 +33,17 @@ public class UserProfileController {
     @Autowired
     private BCryptPasswordEncoder passwordEncoder;
 
-    // Helper: get current user from JWT
+    // Helper: get current user from JWT, ignoring deleted users
     private User getCurrentUser() {
         String email = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        return userRepo.findByEmail(email).orElse(null);
+        return userRepo.findByEmailAndDeletedAtIsNull(email).orElse(null);
     }
 
     /**
      * GET /api/users/me
      * Returns current user's profile info. Never exposes password hash.
      * Role/email cannot be updated here for security reasons.
+     * Ignores deleted users (soft delete).
      */
     @GetMapping
     public ResponseEntity<UserProfileDto> getProfile() {
@@ -99,6 +100,37 @@ public class UserProfileController {
         user.setPasswordHash(passwordEncoder.encode(req.newPassword));
         userRepo.save(user);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * DELETE /api/users/me
+     * Soft deletes the current user by setting deleted_at=now().
+     * Does not drop the row; PII is retained per retention policy.
+     * Enrollments and payments remain for financial records and audit.
+     *
+     * To restore (dev only), use the admin endpoint.
+     */
+    @DeleteMapping
+    public ResponseEntity<?> softDeleteMe() {
+        User user = getCurrentUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        user.setDeletedAt(Instant.now());
+        userRepo.save(user);
+        // Optionally, log out the user or invalidate tokens here
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * DEV ONLY: Admin endpoint to restore a soft-deleted user (clears deleted_at).
+     * Not available in production; for testing and development only.
+     */
+    @PostMapping("/restore/{userId}")
+    public ResponseEntity<?> restoreUser(@PathVariable Long userId) {
+        User user = userRepo.findById(userId).orElse(null);
+        if (user == null) return ResponseEntity.notFound().build();
+        user.setDeletedAt(null);
+        userRepo.save(user);
+        return ResponseEntity.ok().build();
     }
 
     @Data

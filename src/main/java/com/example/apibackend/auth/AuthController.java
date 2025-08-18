@@ -60,7 +60,8 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req) {
-        User user = userRepo.findByEmail(req.email).orElse(null);
+        // Only allow login for users who are not soft-deleted
+        User user = userRepo.findByEmailAndDeletedAtIsNull(req.email).orElse(null);
         log.info("Login attempt: email={}, foundUser={}, hash={}", req.email, user != null, user != null ? user.getPasswordHash() : "null");
         if (user == null || !passwordEncoder.matches(req.password, user.getPasswordHash())) {
             log.warn("Invalid credentials for email: {}", req.email);
@@ -78,7 +79,8 @@ public class AuthController {
      */
     @PostMapping("/forgot-password")
     public ResponseEntity<Void> forgotPassword(@RequestBody ForgotPasswordRequest req) {
-        User user = userRepo.findByEmail(req.email).orElse(null);
+        // Only allow password reset for users who are not soft-deleted
+        User user = userRepo.findByEmailAndDeletedAtIsNull(req.email).orElse(null);
         if (user != null) {
             // Only allow one valid token per user at a time (business logic)
             LocalDateTime now = LocalDateTime.now();

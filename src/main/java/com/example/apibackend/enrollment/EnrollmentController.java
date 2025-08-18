@@ -38,7 +38,7 @@ public class EnrollmentController {
         // Extract user ID from JWT principal
         User principal = (User) authentication.getPrincipal();
         Long userId = principal.getId();
-        List<Enrollment> enrollments = enrollmentRepo.findByUserId(userId);
+        List<Enrollment> enrollments = enrollmentRepo.findByUserIdAndUser_DeletedAtIsNull(userId);
         List<EnrollmentDto> dtos = enrollments.stream().map(EnrollmentDto::new).collect(Collectors.toList());
         return ResponseEntity.ok(dtos);
     }

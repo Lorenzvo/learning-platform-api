@@ -17,5 +17,10 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
 
     List<Enrollment> findByUserId(Long userId);
 
+    // Only return enrollments for users who are not soft-deleted
+    List<Enrollment> findByUserIdAndUser_DeletedAtIsNull(Long userId);
+
     long countByUserId(Long id);
+
+    long countByUserIdAndUser_DeletedAtIsNull(Long userId);
 }
