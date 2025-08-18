@@ -24,6 +24,9 @@ public interface LessonRepository extends JpaRepository<Lesson, Long> {
     // Find demo/preview lesson quickly
     Optional<Lesson> findFirstByModuleIdAndIsDemoTrueOrderByIdAsc(Long moduleId);
 
+    // Returns demo lessons for a list of module IDs
+    List<Lesson> findByModuleIdInAndIsDemoTrue(List<Long> moduleIds);
+
     // Useful stats
     long countByModuleId(Long moduleId);
 

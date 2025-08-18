@@ -197,4 +197,29 @@ public class CourseController {
             this.expiresAt = expiresAt;
         }
     }
+
+    /**
+     * GET /api/courses/{slug}/preview
+     * Returns only demo lessons for the course (is_demo=true).
+     */
+    @GetMapping("/{slug}/preview")
+    public ResponseEntity<List<LessonDto>> getCoursePreview(@PathVariable String slug) {
+        var course = repo.findBySlugAndIsActiveTrue(slug).orElse(null);
+        if (course == null) return ResponseEntity.notFound().build();
+        // Fetch all modules for this course
+        List<Module> modules = moduleRepo.findByCourseId(course.getId());
+        List<Long> moduleIds = new java.util.ArrayList<>();
+        for (Module m : modules) moduleIds.add(m.getId());
+        // Fetch demo lessons for these modules
+        List<Lesson> demoLessons = moduleIds.isEmpty() ? java.util.Collections.emptyList() : lessonRepo.findByModuleIdInAndIsDemoTrue(moduleIds);
+        List<LessonDto> dtos = new java.util.ArrayList<>();
+        for (Lesson lesson : demoLessons) dtos.add(new LessonDto(
+            lesson.getId(),
+            lesson.getTitle(),
+            lesson.getType().name(),
+            lesson.getDurationSeconds(),
+            lesson.isDemo()
+        ));
+        return ResponseEntity.ok(dtos);
+    }
 }
