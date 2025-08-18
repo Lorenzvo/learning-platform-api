@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -26,6 +27,8 @@ import java.nio.charset.StandardCharsets;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import com.example.apibackend.enrollment.EnrollmentRepository;
+import com.example.apibackend.enrollment.Enrollment;
 
 /**
  * Public course catalog endpoints.
@@ -41,12 +44,14 @@ public class CourseController {
     private final CourseRepository repo;
     private final ModuleRepository moduleRepo; // Inject module repository
     private final LessonRepository lessonRepo; // Inject lesson repository
+    private final EnrollmentRepository enrollmentRepo;
 
     // Constructor injection for all repositories
-    public CourseController(CourseRepository repo, ModuleRepository moduleRepo, LessonRepository lessonRepo) {
+    public CourseController(CourseRepository repo, ModuleRepository moduleRepo, LessonRepository lessonRepo, EnrollmentRepository enrollmentRepo) {
         this.repo = repo;
         this.moduleRepo = moduleRepo;
         this.lessonRepo = lessonRepo;
+        this.enrollmentRepo = enrollmentRepo;
     }
 
     /**
@@ -59,17 +64,20 @@ public class CourseController {
     public ResponseEntity<CourseDetailDto> getCourseDetail(@PathVariable String slug) {
         return repo.findBySlugAndIsActiveTrue(slug)
                 .map(course -> {
+                    // Fetch instructor summary
+                    InstructorRepository instructorRepo = com.example.apibackend.LearningPlatformApiApplication.getBean(InstructorRepository.class);
+                    var instructor = instructorRepo.findById(course.getInstructorId()).orElse(null);
+                    InstructorController.InstructorSummaryDto instructorDto = instructor != null ? InstructorController.InstructorSummaryDto.fromEntity(instructor) : null;
                     // Fetch all modules for this course, ordered by position
                     List<Module> modules = moduleRepo.findByCourseIdOrderByPositionAsc(course.getId());
-                    // For each module, fetch lessons ordered by position
                     List<ModuleDto> moduleDtos = modules.stream().map(module -> {
                         List<Lesson> lessons = lessonRepo.findByModuleIdOrderByIdAsc(module.getId());
                         List<LessonDto> lessonDtos = lessons.stream().map(lesson -> new LessonDto(
                                 lesson.getId(),
                                 lesson.getTitle(),
-                                lesson.getType().name(), // Convert enum to String
+                                lesson.getType().name(),
                                 lesson.getDurationSeconds(),
-                                lesson.isDemo() // Fixed: use isDemo() for boolean field with Lombok @Getter
+                                lesson.isDemo()
                         )).collect(Collectors.toList());
                         return new ModuleDto(
                                 module.getId(),
@@ -78,6 +86,10 @@ public class CourseController {
                                 lessonDtos
                         );
                     }).collect(Collectors.toList());
+                    // Fetch reviews summary
+                    ReviewRepository reviewRepo = com.example.apibackend.LearningPlatformApiApplication.getBean(ReviewRepository.class);
+                    Double avgRating = reviewRepo.findAverageRatingByCourseId(course.getId());
+                    long reviewCount = reviewRepo.countByCourseId(course.getId());
                     // Assemble the course detail DTO
                     return new CourseDetailDto(
                             course.getTitle(),
@@ -87,7 +99,10 @@ public class CourseController {
                             course.getDescription(),
                             course.getThumbnailUrl(),
                             course.getIsActive(),
-                            moduleDtos
+                            moduleDtos,
+                            instructorDto,
+                            avgRating != null ? avgRating : 0.0,
+                            reviewCount
                     );
                 })
                 .map(ResponseEntity::ok)
@@ -173,6 +188,39 @@ public class CourseController {
         String token = signHmac(payload, appSecret);
         // Never expose raw media URLs! Instead, issue a token for secure access.
         // In production, use a CDN/S3 signed URL here.
+        return ResponseEntity.ok(new DemoTokenResponse(token, expiresAt.toString()));
+    }
+
+    /**
+     * GET /api/courses/{courseId}/lessons/{lessonId}/playback
+     * Checks user's ACTIVE enrollment, verifies lesson belongs to course and is not a demo,
+     * and returns a short-lived signed token (HMAC or pre-signed URL stub).
+     */
+    @GetMapping("/{courseId}/lessons/{lessonId}/playback")
+    public ResponseEntity<?> getLessonPlaybackToken(
+            @PathVariable Long courseId,
+            @PathVariable Long lessonId,
+            @AuthenticationPrincipal com.example.apibackend.user.User user
+    ) {
+        // Check enrollment
+        var enrollmentOpt = enrollmentRepo.findByUserIdAndCourseId(user.getId(), courseId);
+        var enrollment = enrollmentOpt.orElse(null);
+        if (enrollment == null || enrollment.getStatus() != Enrollment.EnrollmentStatus.ACTIVE) {
+            return ResponseEntity.status(403).body("No active enrollment");
+        }
+        // Check lesson
+        Lesson lesson = lessonRepo.findById(lessonId).orElse(null);
+        if (lesson == null || lesson.isDemo()) {
+            return ResponseEntity.status(403).body("Lesson not available for playback");
+        }
+        Module module = lesson.getModule();
+        if (module == null || module.getCourse() == null || !courseId.equals(module.getCourse().getId())) {
+            return ResponseEntity.status(403).body("Lesson does not belong to course");
+        }
+        // Generate short-lived token (HMAC stub)
+        Instant expiresAt = Instant.now().plus(10, ChronoUnit.MINUTES);
+        String payload = lessonId + ":" + user.getId() + ":" + expiresAt.getEpochSecond();
+        String token = signHmac(payload, appSecret);
         return ResponseEntity.ok(new DemoTokenResponse(token, expiresAt.toString()));
     }
 

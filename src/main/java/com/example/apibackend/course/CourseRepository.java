@@ -3,6 +3,7 @@ package com.example.apibackend.course;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -34,4 +35,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     );
 
     boolean existsBySlug(@NotBlank @Size(max = 255) String slug);
+
+    // Returns all courses taught by a given instructor
+    List<Course> findByInstructorId(Long instructorId);
 }
