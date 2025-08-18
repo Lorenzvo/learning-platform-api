@@ -41,11 +41,15 @@ security:
     issuer: "learning-platform"
     accessTokenTtlMinutes: 15
 #
-# stripe:
-#   apiKey: ${STRIPE_API_KEY:}
-#   webhookSecret: ${STRIPE_WEBHOOK_SECRET:}
-#
+stripe:
+  secretKey: "sk_test_REPLACE_ME"   # Stripe test secret key (never commit real keys)
+  webhookSecret: whsec_750a8f767d366e00f31db982e00a718d59a591a657aa14e75a2e89c7ea5769d9 # Stripe webhook signing secret (never commit real keys)
+# # Use only test mode keys in development. Never hardcode or commit production secrets.
 # spring:
 #   datasource:
 #     # Example for using a different port if 3306 conflicts:
 #     url: jdbc:mysql://localhost:3307/learning?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+
+logging:
+  level:
+    root: INFO

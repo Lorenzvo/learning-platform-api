@@ -7,6 +7,11 @@ import com.example.apibackend.course.Course;
 import com.example.apibackend.course.CourseRepository;
 import com.example.apibackend.user.User;
 import com.example.apibackend.user.UserRepository;
+import com.stripe.Stripe;
+import com.stripe.model.PaymentIntent;
+import com.stripe.param.PaymentIntentCreateParams;
+import com.stripe.exception.StripeException;
+import com.stripe.net.RequestOptions;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,13 +39,13 @@ public class PaymentService {
 
     @Transactional
     public CheckoutResponseDTO createOrGetPendingPayment(Long userId, Long courseId) {
-        // Check for existing PENDING payment for this user+course (idempotency)
         Optional<Payment> existing = paymentRepository.findTopByUserIdAndCourseIdAndStatusOrderByCreatedAtDesc(
                 userId, courseId, Payment.PaymentStatus.PENDING);
         if (existing.isPresent()) {
             Payment payment = existing.get();
-            // Return existing payment (idempotency)
-            return toCheckoutDTO(payment);
+            // If Stripe PaymentIntent already created, return real clientSecret
+            String clientSecret = payment.getGatewayTxnId() != null ? fetchStripeClientSecret(payment.getGatewayTxnId()) : "cs_test_" + payment.getId();
+            return new CheckoutResponseDTO(payment.getId(), clientSecret, payment.getAmountCents(), payment.getCurrency(), payment.getStatus().name());
         }
 
         // Fetch course and user
@@ -56,19 +61,30 @@ public class PaymentService {
         payment.setAmountCents(course.getPriceCents());
         payment.setCurrency(course.getCurrency() != null ? course.getCurrency() : "USD");
         payment.setStatus(Payment.PaymentStatus.PENDING);
-        // Generate a server-side receiptId (for audit/tracking)
-        payment.setGatewayTxnId(null); // Will be filled by gateway webhook later
-        // Placeholder clientSecret (replace with Stripe/Razorpay integration)
-        String clientSecret = "cs_test_" + UUID.randomUUID();
-        // Save payment row
+        payment.setGatewayTxnId(null); // Will be filled after Stripe intent creation
         payment = paymentRepository.save(payment);
 
-        // NOTE: We write a PENDING row first to track intent and prevent duplicate charges.
-        // Actual payment gateway (Stripe/Razorpay) will update gateway_txn_id and status via webhook.
-        // For real integration, generate clientSecret from gateway API and store gatewayTxnId.
-        // For multi-course/cart, refactor Payment to support multiple courses and update logic here.
-
-        return new CheckoutResponseDTO(payment.getId(), clientSecret, payment.getAmountCents(), payment.getCurrency(), payment.getStatus().name());
+        // Create Stripe PaymentIntent for this course purchase
+        try {
+            PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
+                    .setAmount(Long.valueOf(payment.getAmountCents()))
+                    .setCurrency(payment.getCurrency().toLowerCase())
+                    .putMetadata("paymentId", payment.getId().toString())
+                    .putMetadata("userId", userId.toString())
+                    .putMetadata("courseId", courseId.toString())
+                    .setDescription("Course purchase: " + course.getTitle())
+                    .build();
+            RequestOptions requestOptions = RequestOptions.builder()
+                    .setIdempotencyKey("payment-" + payment.getId())
+                    .build();
+            PaymentIntent intent = PaymentIntent.create(params, requestOptions);
+            payment.setGatewayTxnId(intent.getId()); // Persist Stripe PaymentIntent ID
+            paymentRepository.save(payment);
+            // MVP: One PaymentIntent per course. In future, use payment_items for single cart charge.
+            return new CheckoutResponseDTO(payment.getId(), intent.getClientSecret(), payment.getAmountCents(), payment.getCurrency(), payment.getStatus().name());
+        } catch (StripeException e) {
+            throw new RuntimeException("Stripe PaymentIntent creation failed", e);
+        }
     }
 
     /**
@@ -94,8 +110,10 @@ public class PaymentService {
             Optional<Payment> existing = paymentRepository.findTopByUserIdAndCourseIdAndStatusOrderByCreatedAtDesc(
                     userId, course.getId(), Payment.PaymentStatus.PENDING);
             Payment payment;
+            String clientSecret;
             if (existing.isPresent()) {
                 payment = existing.get();
+                clientSecret = payment.getGatewayTxnId() != null ? fetchStripeClientSecret(payment.getGatewayTxnId()) : "cs_test_" + payment.getId();
             } else {
                 // Create new payment intent
                 User user = userRepository.findById(userId)
@@ -106,17 +124,44 @@ public class PaymentService {
                 payment.setAmountCents(course.getPriceCents());
                 payment.setCurrency(course.getCurrency() != null ? course.getCurrency() : "USD");
                 payment.setStatus(Payment.PaymentStatus.PENDING);
-                payment.setGatewayTxnId(null); // Will be filled by gateway webhook
+                payment.setGatewayTxnId(null);
                 payment = paymentRepository.save(payment);
+                try {
+                    PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
+                            .setAmount(Long.valueOf(payment.getAmountCents()))
+                            .setCurrency(payment.getCurrency().toLowerCase())
+                            .putMetadata("paymentId", payment.getId().toString())
+                            .putMetadata("userId", userId.toString())
+                            .putMetadata("courseId", course.getId().toString())
+                            .setDescription("Course purchase: " + course.getTitle())
+                            .build();
+                    RequestOptions requestOptions = RequestOptions.builder()
+                            .setIdempotencyKey("payment-" + payment.getId())
+                            .build();
+                    PaymentIntent intent = PaymentIntent.create(params, requestOptions);
+                    payment.setGatewayTxnId(intent.getId());
+                    paymentRepository.save(payment);
+                    clientSecret = intent.getClientSecret();
+                } catch (StripeException e) {
+                    throw new RuntimeException("Stripe PaymentIntent creation failed", e);
+                }
             }
-            // Generate clientSecret (stub for Stripe/Razorpay)
-            String clientSecret = "cs_test_" + (payment.getId() != null ? payment.getId() : java.util.UUID.randomUUID());
             paymentDTOs.add(new CartCheckoutResponseDTO.CartPaymentDTO(
                     payment.getId(), course.getId(), payment.getAmountCents(), payment.getCurrency(), payment.getStatus().name(), clientSecret
             ));
         }
         // NOTE: Multiple payments are acceptable for MVP. In future, use payment_items for single charge.
         return new CartCheckoutResponseDTO(paymentDTOs);
+    }
+
+    // Helper to fetch clientSecret from Stripe for an existing PaymentIntent
+    private String fetchStripeClientSecret(String paymentIntentId) {
+        try {
+            PaymentIntent intent = PaymentIntent.retrieve(paymentIntentId);
+            return intent.getClientSecret();
+        } catch (StripeException e) {
+            throw new RuntimeException("Failed to fetch Stripe clientSecret", e);
+        }
     }
 
     // Converts Payment entity to CheckoutResponseDTO

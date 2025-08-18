@@ -22,7 +22,7 @@ public interface LessonRepository extends JpaRepository<Lesson, Long> {
     Page<Lesson> findByModuleCourseId(Long courseId, Pageable pageable);
 
     // Find demo/preview lesson quickly
-    Optional<Lesson> findFirstByModuleIdAndDemoTrueOrderByIdAsc(Long moduleId);
+    Optional<Lesson> findFirstByModuleIdAndIsDemoTrueOrderByIdAsc(Long moduleId);
 
     // Useful stats
     long countByModuleId(Long moduleId);
