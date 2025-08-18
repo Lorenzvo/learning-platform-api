@@ -67,6 +67,10 @@ public class Payment {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Setter
+    @Column(name = "refunded_at")
+    private Instant refundedAt;
+
 
     @PrePersist @PreUpdate
     void normalize() {

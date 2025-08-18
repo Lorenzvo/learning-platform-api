@@ -16,9 +16,11 @@ import java.util.List;
 @RequestMapping("/api/admin/payments")
 public class AdminPaymentController {
     private final PaymentRepository paymentRepo;
+    private final PaymentService paymentService;
 
-    public AdminPaymentController(PaymentRepository paymentRepo) {
+    public AdminPaymentController(PaymentRepository paymentRepo, PaymentService paymentService) {
         this.paymentRepo = paymentRepo;
+        this.paymentService = paymentService;
     }
 
     /**
@@ -62,5 +64,18 @@ public class AdminPaymentController {
                 .header("Content-Type", "text/csv")
                 .body(stream);
     }
-}
 
+    /**
+     * POST /api/admin/payments/{paymentId}/refund
+     * Admin-only: Refunds a successful payment and revokes enrollment if present.
+     * Side effects: Updates payment status, records refund timestamp, updates enrollment status, logs audit event.
+     * Refunds are admin-only to prevent abuse and ensure proper audit trail.
+     */
+    @PostMapping("/{paymentId}/refund")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> refundPayment(@PathVariable Long paymentId) {
+        // Call service to process refund
+        paymentService.refundPayment(paymentId);
+        return ResponseEntity.ok().build();
+    }
+}

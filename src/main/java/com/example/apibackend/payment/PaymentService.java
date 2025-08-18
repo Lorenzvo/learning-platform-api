@@ -19,6 +19,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import com.example.apibackend.enrollment.Enrollment;
+import com.example.apibackend.enrollment.EnrollmentRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 @RequiredArgsConstructor
@@ -26,7 +30,9 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
-    private final CartRepository cartRepository; // Add CartRepository
+    private final CartRepository cartRepository;
+    private final EnrollmentRepository enrollmentRepository;
+    private static final Logger logger = LoggerFactory.getLogger(PaymentService.class);
 
     /**
      * Creates a new PENDING payment or returns an existing one for idempotency.
@@ -169,5 +175,36 @@ public class PaymentService {
         // In real gateway integration, clientSecret would come from Stripe/Razorpay
         String clientSecret = "cs_test_" + (payment.getId() != null ? payment.getId() : UUID.randomUUID());
         return new CheckoutResponseDTO(payment.getId(), clientSecret, payment.getAmountCents(), payment.getCurrency(), payment.getStatus().name());
+    }
+
+    /**
+     * Refunds a successful payment and revokes enrollment if present.
+     * Side effects: Updates payment status, records refund timestamp, updates enrollment status, logs audit event.
+     * Refunds are admin-only to prevent abuse and ensure proper audit trail.
+     */
+    @Transactional
+    public void refundPayment(Long paymentId) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new IllegalArgumentException("Payment not found"));
+        if (payment.getStatus() != Payment.PaymentStatus.SUCCESS) {
+            throw new IllegalStateException("Only successful payments can be refunded");
+        }
+        // Update payment status and refund timestamp
+        payment.setStatus(Payment.PaymentStatus.REFUNDED);
+        payment.setRefundedAt(java.time.Instant.now());
+        paymentRepository.save(payment);
+        // Find enrollment for user and course
+        Enrollment enrollment = enrollmentRepository.findByUserIdAndCourseId(
+                payment.getUser().getId(), payment.getCourse().getId()
+        ).orElse(null);
+        if (enrollment != null && enrollment.getStatus() == Enrollment.EnrollmentStatus.ACTIVE) {
+            // Set enrollment status to CANCELED and record revoked_at
+            enrollment.setStatus(Enrollment.EnrollmentStatus.CANCELED);
+            enrollment.setRevokedAt(java.time.Instant.now());
+            enrollmentRepository.save(enrollment);
+        }
+        // TODO: Integrate with payment gateway for actual refund if required
+        // Log audit event for refund
+        logger.info("Admin refunded payment {} for user {} and course {}", paymentId, payment.getUser().getId(), payment.getCourse().getId());
     }
 }

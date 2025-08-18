@@ -60,4 +60,8 @@ public class Enrollment {
     )
     private Instant createdAt;
 
+    @Setter
+    @Column(name = "revoked_at")
+    private Instant revokedAt;
+
 }
