@@ -79,6 +79,12 @@ public class Course {
     @Column(name = "thumbnail_url", length = 255)
     private String thumbnailUrl;
 
+    @Setter
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "instructor_id")
+    private com.example.apibackend.instructor.Instructor instructor;
+    public com.example.apibackend.instructor.Instructor getInstructor() { return instructor; }
+
     // Fills shortDescription with long description if not set, compatible with legacy code as description was implemented first
     // Converts currency to uppercase before saving
     @PrePersist @PreUpdate

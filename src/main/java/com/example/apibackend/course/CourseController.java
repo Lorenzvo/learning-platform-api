@@ -1,5 +1,6 @@
 package com.example.apibackend.course;
 
+import com.example.apibackend.instructor.Instructor;
 import com.example.apibackend.lesson.Lesson;
 import com.example.apibackend.module.Module;
 import com.example.apibackend.lesson.LessonDto;
@@ -29,6 +30,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 import com.example.apibackend.enrollment.EnrollmentRepository;
 import com.example.apibackend.enrollment.Enrollment;
+import com.example.apibackend.review.ReviewRepository;
+import com.example.apibackend.instructor.InstructorController;
 
 /**
  * Public course catalog endpoints.
@@ -42,16 +45,18 @@ import com.example.apibackend.enrollment.Enrollment;
 public class CourseController {
 
     private final CourseRepository repo;
-    private final ModuleRepository moduleRepo; // Inject module repository
-    private final LessonRepository lessonRepo; // Inject lesson repository
+    private final ModuleRepository moduleRepo;
+    private final LessonRepository lessonRepo;
     private final EnrollmentRepository enrollmentRepo;
+    private final ReviewRepository reviewRepo;
 
     // Constructor injection for all repositories
-    public CourseController(CourseRepository repo, ModuleRepository moduleRepo, LessonRepository lessonRepo, EnrollmentRepository enrollmentRepo) {
+    public CourseController(CourseRepository repo, ModuleRepository moduleRepo, LessonRepository lessonRepo, EnrollmentRepository enrollmentRepo, ReviewRepository reviewRepo) {
         this.repo = repo;
         this.moduleRepo = moduleRepo;
         this.lessonRepo = lessonRepo;
         this.enrollmentRepo = enrollmentRepo;
+        this.reviewRepo = reviewRepo;
     }
 
     /**
@@ -65,8 +70,7 @@ public class CourseController {
         return repo.findBySlugAndIsActiveTrue(slug)
                 .map(course -> {
                     // Fetch instructor summary
-                    InstructorRepository instructorRepo = com.example.apibackend.LearningPlatformApiApplication.getBean(InstructorRepository.class);
-                    var instructor = instructorRepo.findById(course.getInstructorId()).orElse(null);
+                    Instructor instructor = course.getInstructor();
                     InstructorController.InstructorSummaryDto instructorDto = instructor != null ? InstructorController.InstructorSummaryDto.fromEntity(instructor) : null;
                     // Fetch all modules for this course, ordered by position
                     List<Module> modules = moduleRepo.findByCourseIdOrderByPositionAsc(course.getId());
@@ -87,7 +91,6 @@ public class CourseController {
                         );
                     }).collect(Collectors.toList());
                     // Fetch reviews summary
-                    ReviewRepository reviewRepo = com.example.apibackend.LearningPlatformApiApplication.getBean(ReviewRepository.class);
                     Double avgRating = reviewRepo.findAverageRatingByCourseId(course.getId());
                     long reviewCount = reviewRepo.countByCourseId(course.getId());
                     // Assemble the course detail DTO
@@ -98,7 +101,7 @@ public class CourseController {
                             course.getLevel(),
                             course.getDescription(),
                             course.getThumbnailUrl(),
-                            course.getIsActive(),
+                            Boolean.TRUE.equals(course.getIsActive()),
                             moduleDtos,
                             instructorDto,
                             avgRating != null ? avgRating : 0.0,

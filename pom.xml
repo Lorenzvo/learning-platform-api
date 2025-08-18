@@ -109,6 +109,11 @@
             <artifactId>jaxb-api</artifactId>
             <version>2.3.1</version>
         </dependency>
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>2.3.0</version>
+        </dependency>
         <!-- Stripe Java SDK for payment gateway integration. Never hardcode secrets; use config/env vars. -->
         <!-- For test mode, use Stripe test keys only. -->
         <!-- See https://github.com/stripe/stripe-java/releases for latest version. -->

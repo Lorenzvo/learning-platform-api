@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import com.stripe.model.Event;
@@ -61,8 +62,7 @@ public class PaymentWebhookController {
     @Transactional
     public ResponseEntity<?> handlePaymentWebhook(
             @Valid @RequestBody PaymentWebhookPayload payload,
-            @RequestHeader(value = "X-Signature", required = false) String signature,
-            HttpServletRequest request
+            @RequestHeader(value = "X-Signature", required = false) String signature
     ) {
         log.info("Webhook attempt: paymentId={}, gatewayTxnId={}, status={}, signature={}",
                 payload.paymentId, payload.gatewayTxnId, payload.status, signature);

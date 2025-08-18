@@ -2,6 +2,7 @@ package com.example.apibackend.course;
 
 import java.util.List;
 import com.example.apibackend.module.ModuleDto;
+import com.example.apibackend.instructor.InstructorController.InstructorSummaryDto;
 
 public record CourseDetailDto(
         String title,
@@ -11,7 +12,10 @@ public record CourseDetailDto(
         String longDesc,
         String thumbnailUrl,
         boolean published,
-        List<ModuleDto> modules
+        List<ModuleDto> modules,
+        InstructorSummaryDto instructor,
+        double avgRating,
+        long reviewCount
 ) {
     public CourseDetailDto(Course course) {
         this(
@@ -22,7 +26,10 @@ public record CourseDetailDto(
             course.getDescription(),
             course.getThumbnailUrl(),
             Boolean.TRUE.equals(course.getIsActive()),
-            List.of() // No modules for admin create response
+            List.of(), // No modules for admin create response
+            null,
+            0.0,
+            0L
         );
     }
 }

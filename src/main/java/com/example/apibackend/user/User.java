@@ -42,4 +42,8 @@ public class User {
     )
     private Instant createdAt; // audit timestamp (set by DB default)
 
+    @Setter
+    @Column(name = "deleted_at")
+    private Instant deletedAt; // audit timestamp for soft deletion
+
 }

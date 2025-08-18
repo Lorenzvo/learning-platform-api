@@ -1,7 +1,6 @@
 package com.example.apibackend.user;
 
 import com.example.apibackend.enrollment.EnrollmentRepository;
-import com.example.apibackend.auth.JwtUtil;
 import io.jsonwebtoken.Claims;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -22,8 +21,6 @@ public class UserProfileController {
     private UserRepository userRepo;
     @Autowired
     private EnrollmentRepository enrollmentRepo;
-    @Autowired
-    private JwtUtil jwtUtil;
 
     @Bean
     public BCryptPasswordEncoder passwordEncoder() {
@@ -114,7 +111,7 @@ public class UserProfileController {
     public ResponseEntity<?> softDeleteMe() {
         User user = getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
-        user.setDeletedAt(Instant.now());
+        user.setDeletedAt(java.time.Instant.now());
         userRepo.save(user);
         // Optionally, log out the user or invalidate tokens here
         return ResponseEntity.ok().build();
@@ -142,14 +139,18 @@ public class UserProfileController {
         public Instant createdAt;
         public long enrolledCourseCount;
     }
+
     @Data
     public static class UpdateProfileRequest {
         @Size(min = 2, max = 50)
         public String name;
     }
+
     @Data
     public static class UpdatePasswordRequest {
-        @NotBlank public String currentPassword;
-        @NotBlank public String newPassword;
+        @NotBlank
+        public String currentPassword;
+        @NotBlank
+        public String newPassword;
     }
 }
