@@ -14,10 +14,12 @@ import org.springframework.data.web.SortDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import com.example.apibackend.auth.JwtUtil;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.Claims;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -163,6 +165,9 @@ public class CourseController {
     @Value("${app.secret:defaultSecret}")
     private String appSecret;
 
+    @Value("${media.hmacSecret:defaultSecret}")
+    private String mediaHmacSecret;
+
     /**
      * GET /api/courses/{courseId}/demo/{lessonId}
      * Returns a signed token for demo lesson playback if valid.
@@ -198,33 +203,46 @@ public class CourseController {
      * GET /api/courses/{courseId}/lessons/{lessonId}/playback
      * Checks user's ACTIVE enrollment, verifies lesson belongs to course and is not a demo,
      * and returns a short-lived signed token (HMAC or pre-signed URL stub).
+     * Never expose raw media URLs! Instead, issue a token for secure access.
+     * In production, this would be replaced with a signed CDN/S3 URL for secure, time-limited access.
      */
     @GetMapping("/{courseId}/lessons/{lessonId}/playback")
     public ResponseEntity<?> getLessonPlaybackToken(
             @PathVariable Long courseId,
             @PathVariable Long lessonId,
-            @AuthenticationPrincipal com.example.apibackend.user.User user
+            @RequestHeader("Authorization") String authHeader
     ) {
+        // Derive userId from JWT
+        String token = authHeader.replace("Bearer ", "");
+        Long userId = extractUserIdFromJwt(token);
+        if (userId == null) {
+            return ResponseEntity.status(401).body("Invalid token");
+        }
         // Check enrollment
-        var enrollmentOpt = enrollmentRepo.findByUserIdAndCourseId(user.getId(), courseId);
+        var enrollmentOpt = enrollmentRepo.findByUserIdAndCourseId(userId, courseId);
         var enrollment = enrollmentOpt.orElse(null);
         if (enrollment == null || enrollment.getStatus() != Enrollment.EnrollmentStatus.ACTIVE) {
             return ResponseEntity.status(403).body("No active enrollment");
         }
         // Check lesson
         Lesson lesson = lessonRepo.findById(lessonId).orElse(null);
-        if (lesson == null || lesson.isDemo()) {
-            return ResponseEntity.status(403).body("Lesson not available for playback");
+        if (lesson == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (lesson.isDemo()) {
+            return ResponseEntity.status(404).body("Demo lessons not available for playback");
         }
         Module module = lesson.getModule();
         if (module == null || module.getCourse() == null || !courseId.equals(module.getCourse().getId())) {
-            return ResponseEntity.status(403).body("Lesson does not belong to course");
+            return ResponseEntity.status(404).body("Lesson does not belong to course");
         }
         // Generate short-lived token (HMAC stub)
         Instant expiresAt = Instant.now().plus(10, ChronoUnit.MINUTES);
-        String payload = lessonId + ":" + user.getId() + ":" + expiresAt.getEpochSecond();
-        String token = signHmac(payload, appSecret);
-        return ResponseEntity.ok(new DemoTokenResponse(token, expiresAt.toString()));
+        String payload = lessonId + ":" + userId + ":" + expiresAt.getEpochSecond();
+        String playbackToken = signHmac(payload, mediaHmacSecret);
+        // Never expose raw media URLs! Instead, issue a token for secure access.
+        // In production, use a CDN/S3 signed URL here.
+        return ResponseEntity.ok(new DemoTokenResponse(playbackToken, expiresAt.toString()));
     }
 
     // HMAC signing helper
@@ -236,6 +254,27 @@ public class CourseController {
             return Base64.getUrlEncoder().withoutPadding().encodeToString(hmac) + "." + Base64.getUrlEncoder().withoutPadding().encodeToString(data.getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
             throw new RuntimeException("Failed to sign token", e);
+        }
+    }
+
+    // Helper to extract userId from JWT
+    private Long extractUserIdFromJwt(String token) {
+        try {
+            io.jsonwebtoken.Claims claims = io.jsonwebtoken.Jwts.parser()
+                .setSigningKey(mediaHmacSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                .parseClaimsJws(token)
+                .getBody();
+            Object userIdObj = claims.get("userId");
+            if (userIdObj instanceof Integer) {
+                return ((Integer) userIdObj).longValue();
+            } else if (userIdObj instanceof Long) {
+                return (Long) userIdObj;
+            } else if (userIdObj instanceof String) {
+                return Long.parseLong((String) userIdObj);
+            }
+            return null;
+        } catch (Exception e) {
+            return null;
         }
     }
 
