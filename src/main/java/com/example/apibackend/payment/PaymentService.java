@@ -1,5 +1,8 @@
 package com.example.apibackend.payment;
 
+import com.example.apibackend.cart.CartRepository;
+import com.example.apibackend.cart.Cart;
+import com.example.apibackend.cart.CartItem;
 import com.example.apibackend.course.Course;
 import com.example.apibackend.course.CourseRepository;
 import com.example.apibackend.user.User;
@@ -8,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -17,6 +21,7 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
+    private final CartRepository cartRepository; // Add CartRepository
 
     /**
      * Creates a new PENDING payment or returns an existing one for idempotency.
@@ -64,6 +69,54 @@ public class PaymentService {
         // For multi-course/cart, refactor Payment to support multiple courses and update logic here.
 
         return new CheckoutResponseDTO(payment.getId(), clientSecret, payment.getAmountCents(), payment.getCurrency(), payment.getStatus().name());
+    }
+
+    /**
+     * Creates or reuses PENDING payments for all published courses in user's cart.
+     * Returns array of payment DTOs for each course. Multiple payments are acceptable for MVP.
+     * In future, a payment_items table would allow a single charge for all cart items.
+     */
+    @Transactional
+    public CartCheckoutResponseDTO createOrGetPendingPaymentsForCart(Long userId) {
+        // Find user's cart
+        Cart cart = cartRepository.findByUserId(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Cart not found"));
+        List<CartCheckoutResponseDTO.CartPaymentDTO> paymentDTOs = new java.util.ArrayList<>();
+        for (CartItem item : cart.getItems()) {
+            // Fetch course and validate published
+            Course course = courseRepository.findById(item.getCourseId())
+                    .orElse(null);
+            if (course == null || !Boolean.TRUE.equals(course.getIsActive())) {
+                // Skip unpublished or missing courses
+                continue;
+            }
+            // Idempotency: reuse existing PENDING payment if present
+            Optional<Payment> existing = paymentRepository.findTopByUserIdAndCourseIdAndStatusOrderByCreatedAtDesc(
+                    userId, course.getId(), Payment.PaymentStatus.PENDING);
+            Payment payment;
+            if (existing.isPresent()) {
+                payment = existing.get();
+            } else {
+                // Create new payment intent
+                User user = userRepository.findById(userId)
+                        .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                payment = new Payment();
+                payment.setUser(user);
+                payment.setCourse(course);
+                payment.setAmountCents(course.getPriceCents());
+                payment.setCurrency(course.getCurrency() != null ? course.getCurrency() : "USD");
+                payment.setStatus(Payment.PaymentStatus.PENDING);
+                payment.setGatewayTxnId(null); // Will be filled by gateway webhook
+                payment = paymentRepository.save(payment);
+            }
+            // Generate clientSecret (stub for Stripe/Razorpay)
+            String clientSecret = "cs_test_" + (payment.getId() != null ? payment.getId() : java.util.UUID.randomUUID());
+            paymentDTOs.add(new CartCheckoutResponseDTO.CartPaymentDTO(
+                    payment.getId(), course.getId(), payment.getAmountCents(), payment.getCurrency(), payment.getStatus().name(), clientSecret
+            ));
+        }
+        // NOTE: Multiple payments are acceptable for MVP. In future, use payment_items for single charge.
+        return new CartCheckoutResponseDTO(paymentDTOs);
     }
 
     // Converts Payment entity to CheckoutResponseDTO

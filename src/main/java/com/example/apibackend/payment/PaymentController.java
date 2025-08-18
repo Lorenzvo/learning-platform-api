@@ -33,6 +33,22 @@ public class PaymentController {
         return ResponseEntity.ok(dto);
     }
 
+    /**
+     * Handles cart checkout for multi-course purchase.
+     * Accepts user token, finds user's cart, and creates one PENDING payment per course.
+     * Returns array of payment DTOs. Multiple payments are acceptable for MVP simplicity.
+     *
+     * In future, a payment_items table would allow a single charge for all cart items.
+     */
+    @PostMapping("/cart")
+    public ResponseEntity<CartCheckoutResponseDTO> checkoutCart(
+            @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        Long userId = extractUserId(userDetails);
+        CartCheckoutResponseDTO dto = paymentService.createOrGetPendingPaymentsForCart(userId);
+        return ResponseEntity.ok(dto);
+    }
+
     // Helper to extract userId from UserDetails (uses getId() on the principal if available)
     private Long extractUserId(UserDetails userDetails) {
         // If your UserDetails is actually your User entity, just call getId()
