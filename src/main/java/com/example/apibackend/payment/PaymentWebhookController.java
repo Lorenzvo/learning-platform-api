@@ -20,6 +20,7 @@ import com.stripe.model.Event;
 import com.stripe.model.PaymentIntent;
 import com.stripe.net.Webhook;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 
 import jakarta.validation.Valid;
 
@@ -150,22 +151,33 @@ public class PaymentWebhookController {
         }
         log.info("Stripe event type: {} id: {}", event.getType(), event.getId());
         if ("payment_intent.succeeded".equals(event.getType()) || "payment_intent.payment_failed".equals(event.getType())) {
-            PaymentIntent intent = (PaymentIntent) event.getDataObjectDeserializer().getObject().orElse(null);
-            if (intent == null) {
-                log.warn("Stripe PaymentIntent missing in event");
+            JsonNode dataObject;
+            try {
+                Object stripeObject = event.getData().getObject();
+                if (stripeObject instanceof String) {
+                    dataObject = objectMapper.readTree((String) stripeObject);
+                } else {
+                    dataObject = objectMapper.valueToTree(stripeObject);
+                }
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                log.error("Failed to parse Stripe event data object: {}", e.getMessage());
                 return ResponseEntity.ok().build();
             }
-            String paymentIntentId = intent.getId();
+            String paymentIntentId = dataObject.has("id") ? dataObject.get("id").asText() : null;
             String status = "payment_intent.succeeded".equals(event.getType()) ? "SUCCESS" : "FAILED";
-            // Try to find Payment by gateway_txn_id (PaymentIntent id)
-            Payment payment = paymentRepo.findByGatewayTxnId(paymentIntentId).orElse(null);
-            if (payment == null && intent.getMetadata() != null && intent.getMetadata().containsKey("paymentId")) {
+            Long paymentId = null;
+            if (dataObject.has("metadata") && dataObject.get("metadata").has("paymentId")) {
                 try {
-                    Long paymentId = Long.valueOf(intent.getMetadata().get("paymentId"));
-                    payment = paymentRepo.findById(paymentId).orElse(null);
+                    paymentId = Long.valueOf(dataObject.get("metadata").get("paymentId").asText());
                 } catch (Exception ex) {
                     log.warn("Could not parse paymentId from Stripe metadata: {}", ex.getMessage());
                 }
+            }
+            Payment payment = null;
+            if (paymentId != null) {
+                payment = paymentRepo.findById(paymentId).orElse(null);
+            } else if (paymentIntentId != null) {
+                payment = paymentRepo.findByGatewayTxnId(paymentIntentId).orElse(null);
             }
             if (payment == null) {
                 log.warn("No matching Payment found for Stripe PaymentIntent id {}", paymentIntentId);

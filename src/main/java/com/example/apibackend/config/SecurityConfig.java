@@ -42,6 +42,8 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").permitAll()
                         // Admin endpoints: require ROLE_ADMIN
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        // Stripe webhook endpoint: allow unauthenticated POSTs
+                        .requestMatchers(HttpMethod.POST, "/api/webhooks/payment/stripe").permitAll()
                         // Everything else: require authentication (ROLE_USER or ROLE_ADMIN)
                         .anyRequest().authenticated()
                 )

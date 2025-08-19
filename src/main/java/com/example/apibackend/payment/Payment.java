@@ -27,7 +27,7 @@ import java.time.Instant;
 )
 
 public class Payment {
-    public static enum PaymentStatus { PENDING, SUCCESS, FAILED, REFUNDED }
+    public enum PaymentStatus { PENDING, SUCCESS, FAILED, REFUNDED }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -68,7 +68,6 @@ public class Payment {
     private Instant createdAt;
 
     @Setter
-    @Column(name = "refunded_at")
     private Instant refundedAt;
 
 

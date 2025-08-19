@@ -9,18 +9,10 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 public class CartCheckoutResponseDTO {
-    private List<CartPaymentDTO> payments;
-
-    @Data
-    @AllArgsConstructor
-    @NoArgsConstructor
-    public static class CartPaymentDTO {
-        private Long paymentId;
-        private Long courseId;
-        private Integer amount;
-        private String currency;
-        private String status;
-        private String clientSecret;
-    }
+    private Long paymentId;
+    private Integer totalAmount;
+    private String currency;
+    private String status;
+    private String clientSecret;
+    private List<Long> courseIds;
 }
-
