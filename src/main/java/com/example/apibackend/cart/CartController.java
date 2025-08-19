@@ -36,6 +36,7 @@ public class CartController {
         return ResponseEntity.ok().body("Course removed from cart");
     }
 
+
     /**
      * Gets all items in the user's cart.
      */

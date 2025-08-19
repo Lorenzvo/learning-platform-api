@@ -213,8 +213,22 @@ public class PaymentWebhookController {
                 payment.setGatewayTxnId(paymentIntentId);
                 paymentRepo.save(payment);
                 Long userId = payment.getUser().getId();
-                var paymentItems = paymentItemRepository.findAllByPaymentId(payment.getId());
-                if (!paymentItems.isEmpty()) {
+                if (payment.getCourse() != null) {
+                    // Single course payment
+                    Long courseId = payment.getCourse().getId();
+                    boolean alreadyEnrolled = enrollmentRepo.existsByUserIdAndCourseId(userId, courseId);
+                    if (!alreadyEnrolled) {
+                        Enrollment enrollment = new Enrollment();
+                        enrollment.setUser(payment.getUser());
+                        enrollment.setCourse(payment.getCourse());
+                        enrollment.setStatus(Enrollment.EnrollmentStatus.ACTIVE);
+                        enrollmentRepo.save(enrollment);
+                        emailService.sendEnrollmentConfirmation(payment.getUser(), payment.getCourse());
+                    }
+                    emailService.sendPaymentReceipt(payment.getUser(), payment.getCourse(), payment);
+                } else {
+                    // Cart (bulk) payment: enroll user in all courses from PaymentItems
+                    var paymentItems = paymentItemRepository.findAllByPaymentId(payment.getId());
                     for (var item : paymentItems) {
                         Long courseId = item.getCourse().getId();
                         boolean alreadyEnrolled = enrollmentRepo.existsByUserIdAndCourseId(userId, courseId);
@@ -228,18 +242,6 @@ public class PaymentWebhookController {
                         }
                         emailService.sendPaymentReceipt(payment.getUser(), item.getCourse(), payment);
                     }
-                } else if (payment.getCourse() != null) {
-                    Long courseId = payment.getCourse().getId();
-                    boolean alreadyEnrolled = enrollmentRepo.existsByUserIdAndCourseId(userId, courseId);
-                    if (!alreadyEnrolled) {
-                        Enrollment enrollment = new Enrollment();
-                        enrollment.setUser(payment.getUser());
-                        enrollment.setCourse(payment.getCourse());
-                        enrollment.setStatus(Enrollment.EnrollmentStatus.ACTIVE);
-                        enrollmentRepo.save(enrollment);
-                        emailService.sendEnrollmentConfirmation(payment.getUser(), payment.getCourse());
-                    }
-                    emailService.sendPaymentReceipt(payment.getUser(), payment.getCourse(), payment);
                 }
                 log.info("Payment marked SUCCESS and enrollment(s) created if needed");
             } else if ("FAILED".equals(status)) {

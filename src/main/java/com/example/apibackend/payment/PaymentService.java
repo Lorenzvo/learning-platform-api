@@ -44,7 +44,6 @@ public class PaymentService {
 
     @Transactional
     public CheckoutResponseDTO createOrGetPendingPayment(Long userId, Long courseId) {
-        // Prevent duplicate payment: check if user is already enrolled
         boolean alreadyEnrolled = enrollmentRepository.existsByUserIdAndCourseId(userId, courseId);
         if (alreadyEnrolled) {
             logger.warn("User {} is already enrolled in course {}. Blocking duplicate payment.", userId, courseId);
@@ -52,47 +51,60 @@ public class PaymentService {
         }
         Optional<Payment> existing = paymentRepository.findTopByUserIdAndCourseIdAndStatusOrderByCreatedAtDesc(
                 userId, courseId, Payment.PaymentStatus.PENDING);
-        if (existing.isPresent()) {
-            Payment payment = existing.get();
-            // If Stripe PaymentIntent already created, return real clientSecret
-            String clientSecret = payment.getGatewayTxnId() != null ? fetchStripeClientSecret(payment.getGatewayTxnId()) : "cs_test_" + payment.getId();
-            return new CheckoutResponseDTO(payment.getId(), clientSecret, payment.getAmountCents(), payment.getCurrency(), payment.getStatus().name());
-        }
-
-        // Fetch course and user
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new IllegalArgumentException("Course not found"));
+        String courseTitle = course.getTitle();
+        Integer priceCents = course.getPriceCents();
+        String currency = course.getCurrency() != null ? course.getCurrency() : "USD";
+        if (existing.isPresent()) {
+            Payment payment = existing.get();
+            String clientSecret = payment.getGatewayTxnId() != null ? fetchStripeClientSecret(payment.getGatewayTxnId()) : "cs_test_" + payment.getId();
+            return new CheckoutResponseDTO(
+                payment.getId(),
+                clientSecret,
+                payment.getGatewayTxnId(),
+                courseId,
+                courseTitle,
+                priceCents,
+                currency,
+                payment.getStatus().name()
+            );
+        }
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-        // Create new Payment row with status PENDING
         Payment payment = new Payment();
         payment.setUser(user);
         payment.setCourse(course);
-        payment.setAmountCents(course.getPriceCents());
-        payment.setCurrency(course.getCurrency() != null ? course.getCurrency() : "USD");
+        payment.setAmountCents(priceCents);
+        payment.setCurrency(currency);
         payment.setStatus(Payment.PaymentStatus.PENDING);
-        payment.setGatewayTxnId(null); // Will be filled after Stripe intent creation
+        payment.setGatewayTxnId(null);
         payment = paymentRepository.save(payment);
-
-        // Create Stripe PaymentIntent for this course purchase
         try {
             PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
-                    .setAmount(Long.valueOf(payment.getAmountCents()))
-                    .setCurrency(payment.getCurrency().toLowerCase())
+                    .setAmount(Long.valueOf(priceCents))
+                    .setCurrency(currency.toLowerCase())
                     .putMetadata("paymentId", payment.getId().toString())
                     .putMetadata("userId", userId.toString())
                     .putMetadata("courseId", courseId.toString())
-                    .setDescription("Course purchase: " + course.getTitle())
+                    .setDescription("Course purchase: " + courseTitle)
                     .build();
             RequestOptions requestOptions = RequestOptions.builder()
                     .setIdempotencyKey("payment-" + payment.getId())
                     .build();
             PaymentIntent intent = PaymentIntent.create(params, requestOptions);
-            payment.setGatewayTxnId(intent.getId()); // Persist Stripe PaymentIntent ID
+            payment.setGatewayTxnId(intent.getId());
             paymentRepository.save(payment);
-            // MVP: One PaymentIntent per course. In future, use payment_items for single cart charge.
-            return new CheckoutResponseDTO(payment.getId(), intent.getClientSecret(), payment.getAmountCents(), payment.getCurrency(), payment.getStatus().name());
+            return new CheckoutResponseDTO(
+                payment.getId(),
+                intent.getClientSecret(),
+                intent.getId(),
+                courseId,
+                courseTitle,
+                priceCents,
+                currency,
+                payment.getStatus().name()
+            );
         } catch (StripeException e) {
             throw new RuntimeException("Stripe PaymentIntent creation failed", e);
         }
@@ -110,46 +122,53 @@ public class PaymentService {
         if (items.isEmpty()) {
             throw new IllegalStateException("Cart is empty");
         }
-        // Calculate total amount and currency (assume all courses have same currency for simplicity)
-        int totalAmount = 0;
-        String currency = "USD";
-        List<Long> courseIds = new java.util.ArrayList<>();
+        List<CartCheckoutResponseDTO.CartPaymentItemDTO> paymentItems = new java.util.ArrayList<>();
         for (CartItem item : items) {
             Course course = courseRepository.findById(item.getCourseId())
                     .orElseThrow(() -> new IllegalArgumentException("Course not found: " + item.getCourseId()));
-            totalAmount += course.getPriceCents();
-            currency = course.getCurrency() != null ? course.getCurrency() : currency;
-            courseIds.add(course.getId());
+            String courseTitle = course.getTitle();
+            Integer priceCents = course.getPriceCents();
+            String currency = course.getCurrency() != null ? course.getCurrency() : "USD";
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            Payment payment = new Payment();
+            payment.setUser(user);
+            payment.setCourse(course);
+            payment.setAmountCents(priceCents);
+            payment.setCurrency(currency);
+            payment.setStatus(Payment.PaymentStatus.PENDING);
+            payment.setGatewayTxnId(null);
+            payment = paymentRepository.save(payment);
+            try {
+                PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
+                        .setAmount(Long.valueOf(priceCents))
+                        .setCurrency(currency.toLowerCase())
+                        .putMetadata("paymentId", payment.getId().toString())
+                        .putMetadata("userId", userId.toString())
+                        .putMetadata("courseId", course.getId().toString())
+                        .setDescription("Course purchase: " + courseTitle)
+                        .build();
+                RequestOptions requestOptions = RequestOptions.builder()
+                        .setIdempotencyKey("payment-" + payment.getId())
+                        .build();
+                PaymentIntent intent = PaymentIntent.create(params, requestOptions);
+                payment.setGatewayTxnId(intent.getId());
+                paymentRepository.save(payment);
+                paymentItems.add(new CartCheckoutResponseDTO.CartPaymentItemDTO(
+                    payment.getId(),
+                    intent.getClientSecret(),
+                    intent.getId(),
+                    course.getId(),
+                    courseTitle,
+                    priceCents,
+                    currency,
+                    payment.getStatus().name()
+                ));
+            } catch (StripeException e) {
+                throw new RuntimeException("Stripe PaymentIntent creation failed", e);
+            }
         }
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-        // Create Payment
-        Payment payment = new Payment();
-        payment.setUser(user);
-        payment.setAmountCents(totalAmount);
-        payment.setCurrency(currency);
-        payment.setStatus(Payment.PaymentStatus.PENDING);
-        payment.setGatewayTxnId(null);
-        payment = paymentRepository.save(payment);
-        // Create Stripe PaymentIntent for total amount
-        try {
-            PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
-                    .setAmount((long) totalAmount)
-                    .setCurrency(currency.toLowerCase())
-                    .putMetadata("paymentId", payment.getId().toString())
-                    .putMetadata("userId", userId.toString())
-                    .setDescription("Cart purchase: " + courseIds.size() + " courses")
-                    .build();
-            RequestOptions requestOptions = RequestOptions.builder()
-                    .setIdempotencyKey("cart-payment-" + payment.getId())
-                    .build();
-            PaymentIntent intent = PaymentIntent.create(params, requestOptions);
-            payment.setGatewayTxnId(intent.getId());
-            paymentRepository.save(payment);
-            return new CartCheckoutResponseDTO(payment.getId(), totalAmount, currency, payment.getStatus().name(), intent.getClientSecret(), courseIds);
-        } catch (StripeException e) {
-            throw new RuntimeException("Stripe PaymentIntent creation failed", e);
-        }
+        return new CartCheckoutResponseDTO(paymentItems);
     }
 
     /**
@@ -164,19 +183,32 @@ public class PaymentService {
         if (items.isEmpty()) {
             throw new IllegalStateException("Cart is empty");
         }
-        List<Long> courseIds = new java.util.ArrayList<>();
+        // Calculate total amount and currency (assume all courses have same currency for simplicity)
         int totalAmount = 0;
         String currency = "USD";
+        List<CartCheckoutResponseDTO.CartPaymentItemDTO> paymentItems = new java.util.ArrayList<>();
+        List<Course> cartCourses = new java.util.ArrayList<>();
         for (CartItem item : items) {
-            Course course = courseRepository.findById(item.getCourseId())
-                    .orElseThrow(() -> new IllegalArgumentException("Course not found: " + item.getCourseId()));
+            Long courseId = item.getCourseId();
+            Course course = courseRepository.findById(courseId)
+                    .orElseThrow(() -> new IllegalArgumentException("Course not found: " + courseId));
             totalAmount += course.getPriceCents();
             currency = course.getCurrency() != null ? course.getCurrency() : currency;
-            courseIds.add(course.getId());
+            cartCourses.add(course);
+            paymentItems.add(new CartCheckoutResponseDTO.CartPaymentItemDTO(
+                null, // paymentId will be set after Payment creation
+                null, // clientSecret will be set after PaymentIntent creation
+                null, // piId will be set after PaymentIntent creation
+                courseId,
+                course.getTitle(),
+                course.getPriceCents(),
+                currency,
+                "PENDING"
+            ));
         }
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
-        // Create Payment
+        // Create a single Payment for the whole cart
         Payment payment = new Payment();
         payment.setUser(user);
         payment.setAmountCents(totalAmount);
@@ -184,10 +216,8 @@ public class PaymentService {
         payment.setStatus(Payment.PaymentStatus.PENDING);
         payment.setGatewayTxnId(null);
         payment = paymentRepository.save(payment);
-        // Create PaymentItems for each course
-        for (CartItem item : items) {
-            Course course = courseRepository.findById(item.getCourseId())
-                    .orElseThrow(() -> new IllegalArgumentException("Course not found: " + item.getCourseId()));
+        // Create PaymentItems for each course in the cart
+        for (Course course : cartCourses) {
             PaymentItem paymentItem = new PaymentItem();
             paymentItem.setPayment(payment);
             paymentItem.setCourse(course);
@@ -202,7 +232,7 @@ public class PaymentService {
                     .setCurrency(currency.toLowerCase())
                     .putMetadata("paymentId", payment.getId().toString())
                     .putMetadata("userId", userId.toString())
-                    .setDescription("Cart purchase: " + courseIds.size() + " courses")
+                    .setDescription("Cart purchase: " + items.size() + " courses")
                     .build();
             RequestOptions requestOptions = RequestOptions.builder()
                     .setIdempotencyKey("cart-payment-" + payment.getId())
@@ -210,7 +240,14 @@ public class PaymentService {
             PaymentIntent intent = PaymentIntent.create(params, requestOptions);
             payment.setGatewayTxnId(intent.getId());
             paymentRepository.save(payment);
-            return new CartCheckoutResponseDTO(payment.getId(), totalAmount, currency, payment.getStatus().name(), intent.getClientSecret(), courseIds);
+            // Update all paymentItems with the single payment intent info
+            for (CartCheckoutResponseDTO.CartPaymentItemDTO itemDto : paymentItems) {
+                itemDto.setPaymentId(payment.getId());
+                itemDto.setClientSecret(intent.getClientSecret());
+                itemDto.setPiId(intent.getId());
+                itemDto.setStatus(payment.getStatus().name());
+            }
+            return new CartCheckoutResponseDTO(paymentItems);
         } catch (StripeException e) {
             throw new RuntimeException("Stripe PaymentIntent creation failed", e);
         }
