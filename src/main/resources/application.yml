@@ -37,13 +37,13 @@ info:
 # --- Optional: can add these later when needed ---
 security:
   jwt:
-    secret: "CHANGE_ME_TO_A_SECURE_RANDOM_SECRET_FOR_PRODUCTION" # TODO: Replace with a secure random value in production
+    secret: ${JWT_SECRET}  # JWT secret key (use a strong random key in production)
     issuer: "learning-platform"
     accessTokenTtlMinutes: 15
 #
 stripe:
-  secretKey: "sk_test_REPLACE_ME"   # Stripe test secret key (never commit real keys)
-  webhookSecret: whsec_750a8f767d366e00f31db982e00a718d59a591a657aa14e75a2e89c7ea5769d9 # Stripe webhook signing secret (never commit real keys)
+  secretKey: ${STRIPE_SECRET_KEY}  # Stripe test secret key (never commit real keys)
+  webhookSecret: ${STRIPE_WEBHOOK_SECRET} # Stripe webhook signing secret (never commit real keys)
 # # Use only test mode keys in development. Never hardcode or commit production secrets.
 # spring:
 #   datasource:

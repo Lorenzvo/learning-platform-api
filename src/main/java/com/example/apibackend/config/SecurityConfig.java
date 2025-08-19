@@ -2,6 +2,7 @@ package com.example.apibackend.config;
 
 import com.example.apibackend.auth.JwtAuthFilter;
 import com.example.apibackend.auth.JwtUtil;
+import com.example.apibackend.user.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -21,6 +22,9 @@ public class SecurityConfig {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -42,10 +46,15 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 // Register JwtAuthFilter with JwtAuth bean before UsernamePasswordAuthenticationFilter
-                .addFilterBefore(new JwtAuthFilter(jwtUtil), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new JwtAuthFilter(jwtUtil, userRepository), UsernamePasswordAuthenticationFilter.class)
                 // enable basic auth if I decide to protect something quickly
                 .httpBasic(Customizer.withDefaults())
                 .build();
+    }
+
+    @Bean
+    public org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder passwordEncoder() {
+        return new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder();
     }
     // Inline comments:
     // - Passwords are hashed with bcrypt in AuthController for security.

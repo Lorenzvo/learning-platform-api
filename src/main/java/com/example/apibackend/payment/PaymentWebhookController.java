@@ -130,7 +130,7 @@ public class PaymentWebhookController {
      * Idempotent: replaying events is safe.
      * Logs all attempts for audit.
      */
-    @PostMapping
+    @PostMapping("/stripe")
     @Transactional
     public ResponseEntity<Void> handleStripeWebhook(
             @RequestBody String payload,

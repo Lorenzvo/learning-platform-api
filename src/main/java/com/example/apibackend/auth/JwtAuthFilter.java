@@ -1,5 +1,7 @@
 package com.example.apibackend.auth;
 
+import com.example.apibackend.user.User;
+import com.example.apibackend.user.UserRepository;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -19,7 +21,11 @@ import java.util.List;
  */
 public class JwtAuthFilter extends OncePerRequestFilter {
     private final JwtUtil jwtUtil;
-    public JwtAuthFilter(JwtUtil jwtUtil) { this.jwtUtil = jwtUtil; }
+    private final UserRepository userRepository;
+    public JwtAuthFilter(JwtUtil jwtUtil, UserRepository userRepository) {
+        this.jwtUtil = jwtUtil;
+        this.userRepository = userRepository;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
@@ -32,13 +38,23 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 String email = claims.getSubject();
                 String role = claims.get("role", String.class);
                 Long userId = claims.get("userId", Long.class);
-                // Set authentication with role from token
-                var auth = new UsernamePasswordAuthenticationToken(
-                        email,
+                // Load User entity from DB
+                User user = null;
+                if (userId != null) {
+                    user = userRepository.findById(userId).orElse(null);
+                } else if (email != null) {
+                    user = userRepository.findByEmail(email).orElse(null);
+                }
+                if (user != null) {
+                    var auth = new UsernamePasswordAuthenticationToken(
+                        user,
                         null,
                         List.of(new SimpleGrantedAuthority("ROLE_" + role))
-                );
-                SecurityContextHolder.getContext().setAuthentication(auth);
+                    );
+                    SecurityContextHolder.getContext().setAuthentication(auth);
+                } else {
+                    SecurityContextHolder.clearContext();
+                }
             } catch (JwtException e) {
                 // Invalid token: clear context
                 SecurityContextHolder.clearContext();

@@ -11,7 +11,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.context.annotation.Bean;
 import java.time.Instant;
 
 @RestController
@@ -21,11 +20,6 @@ public class UserProfileController {
     private UserRepository userRepo;
     @Autowired
     private EnrollmentRepository enrollmentRepo;
-
-    @Bean
-    public BCryptPasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
 
     @Autowired
     private BCryptPasswordEncoder passwordEncoder;
