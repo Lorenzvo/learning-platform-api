@@ -26,7 +26,6 @@ public class PaymentItem {
     @Column(name = "amount_cents", nullable = false)
     private Integer amountCents;
 
-    @Column(name = "currency", nullable = false, length = 3)
+    @Column(name = "currency", nullable = false, columnDefinition = "char(3)")
     private String currency;
 }
-

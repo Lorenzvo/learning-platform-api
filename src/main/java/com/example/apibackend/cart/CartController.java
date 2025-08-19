@@ -35,5 +35,13 @@ public class CartController {
         cartService.removeCourseFromCart(user.getId(), courseId);
         return ResponseEntity.ok().body("Course removed from cart");
     }
-}
 
+    /**
+     * Gets all items in the user's cart.
+     */
+    @GetMapping
+    public ResponseEntity<?> getCartItems(@AuthenticationPrincipal User user) {
+        var items = cartService.getCartItems(user.getId());
+        return ResponseEntity.ok(items);
+    }
+}

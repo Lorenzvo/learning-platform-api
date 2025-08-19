@@ -145,7 +145,20 @@
                     </excludes>
                 </configuration>
             </plugin>
-
+            <plugin>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-maven-plugin</artifactId>
+                <version>11.7.2</version>
+                <configuration>
+                    <url>jdbc:mysql://localhost:3307/learning?useSSL=false&amp;allowPublicKeyRetrieval=true&amp;serverTimezone=UTC</url>
+                    <user>app</user>
+                    <password>app</password>
+                    <locations>
+                        <location>filesystem:src/main/resources/db/schema</location>
+                        <location>filesystem:src/main/resources/db/seed-dev</location>
+                    </locations>
+                </configuration>
+            </plugin>
             <!-- Unit & slice tests -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

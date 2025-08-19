@@ -39,8 +39,8 @@ public class Payment {
     private User user;
 
     @Setter
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "course_id", nullable = false)
+    @ManyToOne(optional = true, fetch = FetchType.LAZY)
+    @JoinColumn(name = "course_id", nullable = true)
     private Course course;
 
     // Gateway charge/payment ID (Stripe charge/intent, Razorpay payment, etc.)

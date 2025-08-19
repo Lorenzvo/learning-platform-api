@@ -124,6 +124,15 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * Logout endpoint: for JWT, just return success (client deletes token). Optionally log event.
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout() {
+        log.info("User logged out");
+        return ResponseEntity.ok().body("Logged out successfully");
+    }
+
     // Helper: generate a secure random token (32 bytes hex)
     private String generateToken() {
         byte[] bytes = new byte[32];

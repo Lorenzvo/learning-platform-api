@@ -30,6 +30,7 @@ public class PaymentService {
     private final UserRepository userRepository;
     private final CartRepository cartRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final PaymentItemRepository paymentItemRepository;
     private static final Logger logger = LoggerFactory.getLogger(PaymentService.class);
 
     /**
@@ -130,6 +131,70 @@ public class PaymentService {
         payment.setStatus(Payment.PaymentStatus.PENDING);
         payment.setGatewayTxnId(null);
         payment = paymentRepository.save(payment);
+        // Create Stripe PaymentIntent for total amount
+        try {
+            PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
+                    .setAmount((long) totalAmount)
+                    .setCurrency(currency.toLowerCase())
+                    .putMetadata("paymentId", payment.getId().toString())
+                    .putMetadata("userId", userId.toString())
+                    .setDescription("Cart purchase: " + courseIds.size() + " courses")
+                    .build();
+            RequestOptions requestOptions = RequestOptions.builder()
+                    .setIdempotencyKey("cart-payment-" + payment.getId())
+                    .build();
+            PaymentIntent intent = PaymentIntent.create(params, requestOptions);
+            payment.setGatewayTxnId(intent.getId());
+            paymentRepository.save(payment);
+            return new CartCheckoutResponseDTO(payment.getId(), totalAmount, currency, payment.getStatus().name(), intent.getClientSecret(), courseIds);
+        } catch (StripeException e) {
+            throw new RuntimeException("Stripe PaymentIntent creation failed", e);
+        }
+    }
+
+    /**
+     * Creates or reuses PENDING payments for all published courses in user's cart.
+     * Returns array of payment DTOs for each course. Multiple payments are acceptable for MVP.
+     */
+    @Transactional
+    public CartCheckoutResponseDTO createOrGetPendingPaymentsForCart(Long userId) {
+        Cart cart = cartRepository.findByUserId(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Cart not found"));
+        List<CartItem> items = cart.getItems();
+        if (items.isEmpty()) {
+            throw new IllegalStateException("Cart is empty");
+        }
+        List<Long> courseIds = new java.util.ArrayList<>();
+        int totalAmount = 0;
+        String currency = "USD";
+        for (CartItem item : items) {
+            Course course = courseRepository.findById(item.getCourseId())
+                    .orElseThrow(() -> new IllegalArgumentException("Course not found: " + item.getCourseId()));
+            totalAmount += course.getPriceCents();
+            currency = course.getCurrency() != null ? course.getCurrency() : currency;
+            courseIds.add(course.getId());
+        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        // Create Payment
+        Payment payment = new Payment();
+        payment.setUser(user);
+        payment.setAmountCents(totalAmount);
+        payment.setCurrency(currency);
+        payment.setStatus(Payment.PaymentStatus.PENDING);
+        payment.setGatewayTxnId(null);
+        payment = paymentRepository.save(payment);
+        // Create PaymentItems for each course
+        for (CartItem item : items) {
+            Course course = courseRepository.findById(item.getCourseId())
+                    .orElseThrow(() -> new IllegalArgumentException("Course not found: " + item.getCourseId()));
+            PaymentItem paymentItem = new PaymentItem();
+            paymentItem.setPayment(payment);
+            paymentItem.setCourse(course);
+            paymentItem.setAmountCents(course.getPriceCents());
+            paymentItem.setCurrency(course.getCurrency() != null ? course.getCurrency() : currency);
+            paymentItemRepository.save(paymentItem);
+        }
         // Create Stripe PaymentIntent for total amount
         try {
             PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()

@@ -26,12 +26,20 @@ public class CartService {
      */
     @Transactional
     public void addCourseToCart(Long userId, Long courseId) {
+        Cart cart = cartRepository.findByUserId(userId).orElse(null);
+        if (cart == null) {
+            cart = new Cart();
+            cart.setUserId(userId);
+            cart.setItems(new java.util.ArrayList<>());
+            cart = cartRepository.save(cart);
+            logger.info("Created new cart for user {}", userId);
+        }
         if (enrollmentRepository.existsByUserIdAndCourseId(userId, courseId)) {
             logger.warn("User {} is already enrolled in course {}. Cannot add to cart.", userId, courseId);
             throw new IllegalStateException("You are already enrolled in this course.");
         }
-        Cart cart = cartRepository.findByUserId(userId).orElseThrow(() -> new IllegalArgumentException("Cart not found"));
-        boolean alreadyInCart = cart.getItems().stream().anyMatch(item -> item.getCourseId().equals(courseId));
+        // Check directly in the database for cart item existence
+        boolean alreadyInCart = cartItemRepository.existsByCartIdAndCourseId(cart.getId(), courseId);
         if (alreadyInCart) {
             logger.warn("Course {} is already in user {}'s cart.", courseId, userId);
             throw new IllegalStateException("Course is already in your cart.");
@@ -49,12 +57,26 @@ public class CartService {
     @Transactional
     public void removeCourseFromCart(Long userId, Long courseId) {
         Cart cart = cartRepository.findByUserId(userId).orElseThrow(() -> new IllegalArgumentException("Cart not found"));
-        CartItem item = cart.getItems().stream()
-                .filter(i -> i.getCourseId().equals(courseId))
-                .findFirst()
+        CartItem item = cartItemRepository.findByCartIdAndCourseId(cart.getId(), courseId)
                 .orElseThrow(() -> new IllegalArgumentException("Course not found in cart"));
         cartItemRepository.delete(item);
+        // Remove from cart's items list and save cart to trigger orphan removal
+        if (cart.getItems() != null) {
+            cart.getItems().removeIf(ci -> ci.getId().equals(item.getId()));
+            cartRepository.save(cart);
+        }
         logger.info("Course {} removed from user {}'s cart.", courseId, userId);
     }
-}
 
+    /**
+     * Returns all items in the user's cart.
+     */
+    @Transactional(readOnly = true)
+    public java.util.List<CartItem> getCartItems(Long userId) {
+        Cart cart = cartRepository.findByUserId(userId).orElse(null);
+        if (cart == null) {
+            return java.util.Collections.emptyList();
+        }
+        return cartItemRepository.findByCartId(cart.getId());
+    }
+}

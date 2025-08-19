@@ -19,6 +19,9 @@ spring:
 
   # === Flyway migrations ===
   flyway:
+    url: jdbc:mysql://localhost:3307/learning?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    user: app
+    password: app
     enabled: true
     locations: classpath:db/schema,classpath:db/seed-dev   # # Run schema + dev seed when running the app normally
 

@@ -37,6 +37,7 @@ public class PaymentWebhookController {
     private final PaymentRepository paymentRepo;
     private final EnrollmentRepository enrollmentRepo;
     private final EmailService emailService;
+    private final PaymentItemRepository paymentItemRepository;
     private static final Logger log = LoggerFactory.getLogger(PaymentWebhookController.class);
 
     // Shared secret for signature verification (stub for now)
@@ -96,21 +97,36 @@ public class PaymentWebhookController {
             payment.setStatus(Payment.PaymentStatus.SUCCESS);
             payment.setGatewayTxnId(payload.gatewayTxnId);
             paymentRepo.save(payment);
-            User user = payment.getUser();
-            Course course = payment.getCourse();
-            boolean alreadyEnrolled = enrollmentRepo.existsByUserIdAndCourseId(user.getId(), course.getId());
-            if (!alreadyEnrolled) {
-                Enrollment enrollment = new Enrollment();
-                enrollment.setUser(user);
-                enrollment.setCourse(course);
-                enrollment.setStatus(Enrollment.EnrollmentStatus.ACTIVE);
-                enrollmentRepo.save(enrollment);
-                // Send enrollment confirmation email (stub)
-                emailService.sendEnrollmentConfirmation(user, course);
+            Long userId = payment.getUser().getId();
+            // Bulk payment: enroll user in all courses from PaymentItems
+            var paymentItems = paymentItemRepository.findAllByPaymentId(payment.getId());
+            if (!paymentItems.isEmpty()) {
+                for (var item : paymentItems) {
+                    Long courseId = item.getCourse().getId();
+                    if (!enrollmentRepo.existsByUserIdAndCourseId(userId, courseId)) {
+                        Enrollment enrollment = new Enrollment();
+                        enrollment.setUser(payment.getUser());
+                        enrollment.setCourse(item.getCourse());
+                        enrollment.setStatus(Enrollment.EnrollmentStatus.ACTIVE);
+                        enrollmentRepo.save(enrollment);
+                        emailService.sendEnrollmentConfirmation(payment.getUser(), item.getCourse());
+                    }
+                    emailService.sendPaymentReceipt(payment.getUser(), item.getCourse(), payment);
+                }
+            } else if (payment.getCourse() != null) {
+                // Single course payment fallback
+                Long courseId = payment.getCourse().getId();
+                if (!enrollmentRepo.existsByUserIdAndCourseId(userId, courseId)) {
+                    Enrollment enrollment = new Enrollment();
+                    enrollment.setUser(payment.getUser());
+                    enrollment.setCourse(payment.getCourse());
+                    enrollment.setStatus(Enrollment.EnrollmentStatus.ACTIVE);
+                    enrollmentRepo.save(enrollment);
+                    emailService.sendEnrollmentConfirmation(payment.getUser(), payment.getCourse());
+                }
+                emailService.sendPaymentReceipt(payment.getUser(), payment.getCourse(), payment);
             }
-            // Always send payment receipt email (stub)
-            emailService.sendPaymentReceipt(user, course, payment);
-            log.info("Payment marked SUCCESS and enrollment created if needed");
+            log.info("Payment marked SUCCESS and enrollment(s) created if needed");
             return ResponseEntity.ok("Payment processed and enrollment updated");
         } else if ("FAILED".equalsIgnoreCase(payload.status)) {
             payment.setStatus(Payment.PaymentStatus.FAILED);
@@ -196,20 +212,36 @@ public class PaymentWebhookController {
                 payment.setStatus(Payment.PaymentStatus.SUCCESS);
                 payment.setGatewayTxnId(paymentIntentId);
                 paymentRepo.save(payment);
-                // Create enrollment if not present
                 Long userId = payment.getUser().getId();
-                Long courseId = payment.getCourse().getId();
-                boolean alreadyEnrolled = enrollmentRepo.existsByUserIdAndCourseId(userId, courseId);
-                if (!alreadyEnrolled) {
-                    Enrollment enrollment = new Enrollment();
-                    enrollment.setUser(payment.getUser());
-                    enrollment.setCourse(payment.getCourse());
-                    enrollment.setStatus(Enrollment.EnrollmentStatus.ACTIVE);
-                    enrollmentRepo.save(enrollment);
-                    emailService.sendEnrollmentConfirmation(payment.getUser(), payment.getCourse());
+                var paymentItems = paymentItemRepository.findAllByPaymentId(payment.getId());
+                if (!paymentItems.isEmpty()) {
+                    for (var item : paymentItems) {
+                        Long courseId = item.getCourse().getId();
+                        boolean alreadyEnrolled = enrollmentRepo.existsByUserIdAndCourseId(userId, courseId);
+                        if (!alreadyEnrolled) {
+                            Enrollment enrollment = new Enrollment();
+                            enrollment.setUser(payment.getUser());
+                            enrollment.setCourse(item.getCourse());
+                            enrollment.setStatus(Enrollment.EnrollmentStatus.ACTIVE);
+                            enrollmentRepo.save(enrollment);
+                            emailService.sendEnrollmentConfirmation(payment.getUser(), item.getCourse());
+                        }
+                        emailService.sendPaymentReceipt(payment.getUser(), item.getCourse(), payment);
+                    }
+                } else if (payment.getCourse() != null) {
+                    Long courseId = payment.getCourse().getId();
+                    boolean alreadyEnrolled = enrollmentRepo.existsByUserIdAndCourseId(userId, courseId);
+                    if (!alreadyEnrolled) {
+                        Enrollment enrollment = new Enrollment();
+                        enrollment.setUser(payment.getUser());
+                        enrollment.setCourse(payment.getCourse());
+                        enrollment.setStatus(Enrollment.EnrollmentStatus.ACTIVE);
+                        enrollmentRepo.save(enrollment);
+                        emailService.sendEnrollmentConfirmation(payment.getUser(), payment.getCourse());
+                    }
+                    emailService.sendPaymentReceipt(payment.getUser(), payment.getCourse(), payment);
                 }
-                emailService.sendPaymentReceipt(payment.getUser(), payment.getCourse(), payment);
-                log.info("Payment marked SUCCESS and enrollment created if needed");
+                log.info("Payment marked SUCCESS and enrollment(s) created if needed");
             } else if ("FAILED".equals(status)) {
                 payment.setStatus(Payment.PaymentStatus.FAILED);
                 paymentRepo.save(payment);
