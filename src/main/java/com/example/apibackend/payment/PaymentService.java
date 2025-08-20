@@ -25,6 +25,8 @@ import org.slf4j.LoggerFactory;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.stream.Collectors;
+import com.stripe.model.Refund;
+import com.stripe.param.RefundCreateParams;
 
 @Service
 @RequiredArgsConstructor
@@ -48,9 +50,9 @@ public class PaymentService {
 
     @Transactional
     public CheckoutResponseDTO createOrGetPendingPayment(Long userId, Long courseId) {
-        boolean alreadyEnrolled = enrollmentRepository.existsByUserIdAndCourseId(userId, courseId);
-        if (alreadyEnrolled) {
-            logger.warn("User {} is already enrolled in course {}. Blocking duplicate payment.", userId, courseId);
+        // Check for existing enrollment
+        Enrollment enrollment = enrollmentRepository.findByUserIdAndCourseId(userId, courseId).orElse(null);
+        if (enrollment != null && enrollment.getStatus() == Enrollment.EnrollmentStatus.ACTIVE) {
             throw new IllegalStateException("You are already enrolled in this course.");
         }
         Optional<Payment> existing = paymentRepository.findTopByUserIdAndCourseIdAndStatusOrderByCreatedAtDesc(
@@ -99,6 +101,7 @@ public class PaymentService {
             PaymentIntent intent = PaymentIntent.create(params, requestOptions);
             payment.setGatewayTxnId(intent.getId());
             paymentRepository.save(payment);
+            // Enrollment status should NOT be set to ACTIVE here; only update via webhook on payment success
             return new CheckoutResponseDTO(
                 payment.getId(),
                 intent.getClientSecret(),
@@ -306,19 +309,49 @@ public class PaymentService {
         payment.setStatus(Payment.PaymentStatus.REFUNDED);
         payment.setRefundedAt(java.time.Instant.now());
         paymentRepository.save(payment);
-        // Find enrollment for user and course
-        Enrollment enrollment = enrollmentRepository.findByUserIdAndCourseId(
-                payment.getUser().getId(), payment.getCourse().getId()
-        ).orElse(null);
-        if (enrollment != null && enrollment.getStatus() == Enrollment.EnrollmentStatus.ACTIVE) {
-            // Set enrollment status to CANCELED and record revoked_at
-            enrollment.setStatus(Enrollment.EnrollmentStatus.CANCELED);
-            enrollment.setRevokedAt(java.time.Instant.now());
-            enrollmentRepository.save(enrollment);
+
+        // Check if this is a cart-wide payment (course is null)
+        if (payment.getCourse() == null) {
+            // Refund all PaymentItems and revoke enrollments for each course
+            List<PaymentItem> items = paymentItemRepository.findAllByPaymentId(payment.getId());
+            for (PaymentItem item : items) {
+                Enrollment enrollment = enrollmentRepository.findByUserIdAndCourseId(
+                        payment.getUser().getId(), item.getCourse().getId()
+                ).orElse(null);
+                if (enrollment != null && enrollment.getStatus() == Enrollment.EnrollmentStatus.ACTIVE) {
+                    enrollment.setStatus(Enrollment.EnrollmentStatus.CANCELED);
+                    enrollment.setRevokedAt(java.time.Instant.now());
+                    enrollmentRepository.save(enrollment);
+                }
+                paymentItemRepository.save(item);
+                logger.info("Admin refunded cart item payment {} for user {} and course {}", paymentId, payment.getUser().getId(), item.getCourse().getId());
+            }
+        } else {
+            // Single course payment: revoke enrollment for that course
+            Enrollment enrollment = enrollmentRepository.findByUserIdAndCourseId(
+                    payment.getUser().getId(), payment.getCourse().getId()
+            ).orElse(null);
+            if (enrollment != null && enrollment.getStatus() == Enrollment.EnrollmentStatus.ACTIVE) {
+                enrollment.setStatus(Enrollment.EnrollmentStatus.CANCELED);
+                enrollment.setRevokedAt(java.time.Instant.now());
+                enrollmentRepository.save(enrollment);
+            }
+            logger.info("Admin refunded payment {} for user {} and course {}", paymentId, payment.getUser().getId(), payment.getCourse().getId());
         }
         // TODO: Integrate with payment gateway for actual refund if required
-        // Log audit event for refund
-        logger.info("Admin refunded payment {} for user {} and course {}", paymentId, payment.getUser().getId(), payment.getCourse().getId());
+        // Stripe refund integration
+        try {
+            if (payment.getGatewayTxnId() != null) {
+                RefundCreateParams params = RefundCreateParams.builder()
+                    .setPaymentIntent(payment.getGatewayTxnId())
+                    .build();
+                Refund.create(params);
+                logger.info("Stripe refund issued for PaymentIntent {} (paymentId={})", payment.getGatewayTxnId(), paymentId);
+            }
+        } catch (com.stripe.exception.StripeException e) {
+            logger.error("Stripe refund failed for PaymentIntent {}: {}", payment.getGatewayTxnId(), e.getMessage());
+            throw new RuntimeException("Stripe refund failed", e);
+        }
     }
 
     /**

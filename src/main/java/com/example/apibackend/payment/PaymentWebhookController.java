@@ -110,6 +110,15 @@ public class PaymentWebhookController {
                         enrollment.setStatus(Enrollment.EnrollmentStatus.ACTIVE);
                         enrollmentRepo.save(enrollment);
                         emailService.sendEnrollmentConfirmation(payment.getUser(), item.getCourse());
+                    } else {
+                        // If enrollment exists, set it back to ACTIVE (reactivation)
+                        Enrollment enrollment = enrollmentRepo.findByUserIdAndCourseId(userId, courseId).orElse(null);
+                        if (enrollment != null && enrollment.getStatus() != Enrollment.EnrollmentStatus.ACTIVE) {
+                            enrollment.setStatus(Enrollment.EnrollmentStatus.ACTIVE);
+                            enrollment.setRevokedAt(null);
+                            enrollmentRepo.save(enrollment);
+                            emailService.sendEnrollmentConfirmation(payment.getUser(), item.getCourse());
+                        }
                     }
                     emailService.sendPaymentReceipt(payment.getUser(), item.getCourse(), payment);
                 }
@@ -123,6 +132,15 @@ public class PaymentWebhookController {
                     enrollment.setStatus(Enrollment.EnrollmentStatus.ACTIVE);
                     enrollmentRepo.save(enrollment);
                     emailService.sendEnrollmentConfirmation(payment.getUser(), payment.getCourse());
+                } else {
+                    // If enrollment exists, set it back to ACTIVE (reactivation)
+                    Enrollment enrollment = enrollmentRepo.findByUserIdAndCourseId(userId, courseId).orElse(null);
+                    if (enrollment != null && enrollment.getStatus() != Enrollment.EnrollmentStatus.ACTIVE) {
+                        enrollment.setStatus(Enrollment.EnrollmentStatus.ACTIVE);
+                        enrollment.setRevokedAt(null);
+                        enrollmentRepo.save(enrollment);
+                        emailService.sendEnrollmentConfirmation(payment.getUser(), payment.getCourse());
+                    }
                 }
                 emailService.sendPaymentReceipt(payment.getUser(), payment.getCourse(), payment);
             }
@@ -224,6 +242,15 @@ public class PaymentWebhookController {
                         enrollment.setStatus(Enrollment.EnrollmentStatus.ACTIVE);
                         enrollmentRepo.save(enrollment);
                         emailService.sendEnrollmentConfirmation(payment.getUser(), payment.getCourse());
+                    } else {
+                        // If enrollment exists, set it back to ACTIVE (reactivation)
+                        Enrollment enrollment = enrollmentRepo.findByUserIdAndCourseId(userId, courseId).orElse(null);
+                        if (enrollment != null && enrollment.getStatus() != Enrollment.EnrollmentStatus.ACTIVE) {
+                            enrollment.setStatus(Enrollment.EnrollmentStatus.ACTIVE);
+                            enrollment.setRevokedAt(null);
+                            enrollmentRepo.save(enrollment);
+                            emailService.sendEnrollmentConfirmation(payment.getUser(), payment.getCourse());
+                        }
                     }
                     emailService.sendPaymentReceipt(payment.getUser(), payment.getCourse(), payment);
                 } else {
@@ -239,6 +266,15 @@ public class PaymentWebhookController {
                             enrollment.setStatus(Enrollment.EnrollmentStatus.ACTIVE);
                             enrollmentRepo.save(enrollment);
                             emailService.sendEnrollmentConfirmation(payment.getUser(), item.getCourse());
+                        } else {
+                            // If enrollment exists, set it back to ACTIVE (reactivation)
+                            Enrollment enrollment = enrollmentRepo.findByUserIdAndCourseId(userId, courseId).orElse(null);
+                            if (enrollment != null && enrollment.getStatus() != Enrollment.EnrollmentStatus.ACTIVE) {
+                                enrollment.setStatus(Enrollment.EnrollmentStatus.ACTIVE);
+                                enrollment.setRevokedAt(null);
+                                enrollmentRepo.save(enrollment);
+                                emailService.sendEnrollmentConfirmation(payment.getUser(), item.getCourse());
+                            }
                         }
                         emailService.sendPaymentReceipt(payment.getUser(), item.getCourse(), payment);
                     }

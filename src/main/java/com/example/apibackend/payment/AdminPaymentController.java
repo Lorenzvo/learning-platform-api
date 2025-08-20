@@ -33,6 +33,7 @@ public class AdminPaymentController {
      */
     @GetMapping("/reports/payments.csv")
     @PreAuthorize("hasRole('ADMIN')")
+    // Change to StreamingResponseBody if dataset is large, but til the far future we assume manageable size
     public ResponseEntity<String> exportPaymentsCsv(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
