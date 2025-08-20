@@ -50,10 +50,16 @@ public class EnrollmentController {
         public final Long id;
         public final Long courseId;
         public final String status;
+        public final String courseTitle;      // Add this
+        public final String courseDescription;
+        public final String thumbnailUrl;
         public EnrollmentDto(Enrollment e) {
             this.id = e.getId();
             this.courseId = e.getCourse().getId();
+            this.courseTitle = e.getCourse().getTitle(); // Add this
+            this.courseDescription = e.getCourse().getDescription();
             this.status = e.getStatus().toString();
+            this.thumbnailUrl = e.getCourse().getThumbnailUrl();
         }
     }
 }

@@ -17,7 +17,7 @@ import java.util.List;
 
 @Configuration
 public class SecurityConfig {
-    @Value("${app.cors.allowed-origins:http://localhost:3000}")
+    @Value("${app.cors.allowed-origins:http://localhost:5173}")
     private List<String> allowedOrigins;
 
     @Autowired
