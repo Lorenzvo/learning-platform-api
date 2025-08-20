@@ -130,10 +130,12 @@ public class CourseController {
             @SortDefault.SortDefaults({@SortDefault(sort = "title")}) Pageable pageable,
             @RequestParam(required = false) @Size(max = 100) String q,
             @RequestParam(required = false) @Size(max = 20) String level,
-            @RequestParam(required = false) Boolean published
+            @RequestParam(required = false) Boolean published,
+            @RequestParam(required = false) Double minRating
     ) {
         Page<Course> page = repo.search(q, level, published, pageable);
-        return page.map(c -> {
+        // Map entities to DTOs with average rating and instructor summary
+        Page<CourseSummaryDto> dtoPage = page.map(c -> {
             Double avgRatingObj = reviewRepo.findAverageRatingByCourseId(c.getId());
             double avgRating = avgRatingObj != null ? avgRatingObj : 0.0;
             InstructorSummaryDto instructorSummary = c.getInstructor() != null ? InstructorSummaryDto.fromEntity(c.getInstructor()) : null;
@@ -149,6 +151,14 @@ public class CourseController {
                 instructorSummary
             );
         });
+        // Filter by minRating if provided
+        if (minRating != null) {
+            List<CourseSummaryDto> filtered = dtoPage.stream()
+                .filter(dto -> dto.averageRating() >= minRating)
+                .collect(Collectors.toList());
+            return new org.springframework.data.domain.PageImpl<>(filtered, pageable, filtered.size());
+        }
+        return dtoPage;
     }
 
     @Value("${app.secret:defaultSecret}")

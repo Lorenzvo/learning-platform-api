@@ -8,6 +8,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -30,39 +33,38 @@ public class AdminPaymentController {
      */
     @GetMapping("/reports/payments.csv")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<StreamingResponseBody> exportPaymentsCsv(
+    public ResponseEntity<String> exportPaymentsCsv(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
-        StreamingResponseBody stream = out -> {
-            // CSV header
-            out.write("paymentId,userEmail,courseSlug,amount,currency,status,gatewayTxnId,createdAt\n".getBytes());
-            // Stream payments in date range
-            paymentRepo.findAll().stream()
-                .filter(p -> p.getCreatedAt() != null &&
-                    !p.getCreatedAt().isBefore(from.atStartOfDay().toInstant(ZoneOffset.UTC)) &&
-                    p.getCreatedAt().isBefore(to.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC)))
-                .forEach(p -> {
-                    try {
-                        User user = p.getUser();
-                        Course course = p.getCourse();
-                        String line = String.format("%d,%s,%s,%d,%s,%s,%s,%s\n",
-                                p.getId(),
-                                user.getEmail(),
-                                course.getSlug(),
-                                p.getAmountCents(),
-                                p.getCurrency(),
-                                p.getStatus().name(),
-                                p.getGatewayTxnId(),
-                                p.getCreatedAt());
-                        out.write(line.getBytes());
-                    } catch (Exception ex) { /* log or ignore */ }
-                });
-        };
+        StringBuilder csv = new StringBuilder();
+        csv.append("paymentId,userEmail,courseSlug,amount,currency,status,gatewayTxnId,createdAt\n");
+        paymentRepo.findAll().stream()
+            .filter(p -> p.getCreatedAt() != null &&
+                !p.getCreatedAt().isBefore(from.atStartOfDay().toInstant(ZoneOffset.UTC)) &&
+                p.getCreatedAt().isBefore(to.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC)))
+            .forEach(p -> {
+                String userEmail = p.getUser() != null ? p.getUser().getEmail() : "";
+                String courseSlug = p.getCourse() != null ? p.getCourse().getSlug() : "";
+                String amount = p.getAmountCents() != null ? p.getAmountCents().toString() : "";
+                String currency = p.getCurrency() != null ? p.getCurrency() : "";
+                String status = p.getStatus() != null ? p.getStatus().name() : "";
+                String gatewayTxnId = p.getGatewayTxnId() != null ? p.getGatewayTxnId() : "";
+                String createdAt = p.getCreatedAt() != null ? p.getCreatedAt().toString() : "";
+                csv.append(String.format("%d,%s,%s,%s,%s,%s,%s,%s\n",
+                    p.getId(),
+                    userEmail,
+                    courseSlug,
+                    amount,
+                    currency,
+                    status,
+                    gatewayTxnId,
+                    createdAt));
+            });
         return ResponseEntity.ok()
-                .header("Content-Disposition", "attachment; filename=payments.csv")
-                .header("Content-Type", "text/csv")
-                .body(stream);
+            .header("Content-Disposition", "attachment; filename=payments.csv")
+            .header("Content-Type", "text/csv")
+            .body(csv.toString());
     }
 
     /**
@@ -77,5 +79,18 @@ public class AdminPaymentController {
         // Call service to process refund
         paymentService.refundPayment(paymentId);
         return ResponseEntity.ok().build();
+    }
+
+    /**
+     * GET /api/admin/payments?from=yyyy-MM-dd&to=yyyy-MM-dd
+     * Admin-only: Returns payments in the requested date range as JSON.
+     */
+    @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<PaymentDto>> getPaymentsInRange(
+            @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        List<PaymentDto> payments = paymentService.getPaymentsInRange(from, to);
+        return ResponseEntity.ok(payments);
     }
 }

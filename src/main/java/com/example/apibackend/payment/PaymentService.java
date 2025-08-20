@@ -22,6 +22,10 @@ import com.example.apibackend.enrollment.EnrollmentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.stream.Collectors;
+
 @Service
 @RequiredArgsConstructor
 public class PaymentService {
@@ -315,5 +319,26 @@ public class PaymentService {
         // TODO: Integrate with payment gateway for actual refund if required
         // Log audit event for refund
         logger.info("Admin refunded payment {} for user {} and course {}", paymentId, payment.getUser().getId(), payment.getCourse().getId());
+    }
+
+    /**
+     * Returns payments created in the given date range as PaymentDto list.
+     */
+    public List<PaymentDto> getPaymentsInRange(LocalDate from, LocalDate to) {
+        return paymentRepository.findAll().stream()
+            .filter(p -> p.getCreatedAt() != null &&
+                !p.getCreatedAt().isBefore(from.atStartOfDay().toInstant(ZoneOffset.UTC)) &&
+                p.getCreatedAt().isBefore(to.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC)))
+            .map(p -> new PaymentDto(
+                p.getId(),
+                p.getCreatedAt(),
+                p.getAmountCents(),
+                p.getUser() != null ? p.getUser().getEmail() : null,
+                p.getStatus().name(),
+                p.getCurrency(),
+                p.getGatewayTxnId(),
+                p.getCourse() != null ? p.getCourse().getSlug() : null
+            ))
+            .collect(Collectors.toList());
     }
 }
