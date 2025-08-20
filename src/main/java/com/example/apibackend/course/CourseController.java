@@ -132,35 +132,16 @@ public class CourseController {
             @RequestParam(required = false) @Size(max = 20) String level,
             @RequestParam(required = false) Boolean published
     ) {
-        // If any filter or pagination param is present, use repository search
-        if (q != null || level != null || published != null || pageable.getPageSize() != 12 || pageable.getPageNumber() != 0) {
-            Page<Course> page = repo.search(q, level, published, pageable);
-            // Map entities to DTOs for API safety (never expose JPA entities directly)
-            return page.map(c -> new CourseSummaryDto(
-                    c.getId(),
-                    c.getTitle(),
-                    c.getSlug(),
-                    c.getDescription() != null ? c.getDescription().substring(0, Math.min(80, c.getDescription().length())) : null,
-                    c.getPriceCents(),
-                    c.getLevel(),
-                    c.getIsActive()
-            ));
-        } else {
-            // No filters/pagination: return all active courses as a single page
-            List<CourseSummaryDto> dtos = repo.findAll().stream()
-                    .filter(c -> Boolean.TRUE.equals(c.getIsActive()))
-                    .map(c -> new CourseSummaryDto(
-                            c.getId(),
-                            c.getTitle(),
-                            c.getSlug(),
-                            c.getDescription() != null ? c.getDescription().substring(0, Math.min(80, c.getDescription().length())) : null,
-                            c.getPriceCents(),
-                            c.getLevel(),
-                            c.getIsActive()
-                    )).toList();
-            // Wrap in a single-page Page object
-            return new org.springframework.data.domain.PageImpl<>(dtos);
-        }
+        Page<Course> page = repo.search(q, level, published, pageable);
+        return page.map(c -> new CourseSummaryDto(
+                c.getId(),
+                c.getTitle(),
+                c.getSlug(),
+                c.getDescription() != null ? c.getDescription().substring(0, Math.min(80, c.getDescription().length())) : null,
+                c.getPriceCents(),
+                c.getLevel(),
+                c.getIsActive()
+        ));
     }
 
     @Value("${app.secret:defaultSecret}")
