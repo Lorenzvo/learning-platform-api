@@ -69,14 +69,27 @@ public class CartService {
     }
 
     /**
-     * Returns all items in the user's cart.
+     * Returns all items in the user's cart as DTOs for frontend.
      */
     @Transactional(readOnly = true)
-    public java.util.List<CartItem> getCartItems(Long userId) {
+    public java.util.List<CartItemDto> getCartItems(Long userId) {
         Cart cart = cartRepository.findByUserId(userId).orElse(null);
         if (cart == null) {
             return java.util.Collections.emptyList();
         }
-        return cartItemRepository.findByCartId(cart.getId());
+        var cartItems = cartItemRepository.findByCartId(cart.getId());
+        java.util.List<CartItemDto> result = new java.util.ArrayList<>();
+        for (CartItem item : cartItems) {
+            Course course = courseRepository.findById(item.getCourseId()).orElse(null);
+            if (course != null) {
+                result.add(new CartItemDto(
+                    course.getId(),
+                    course.getTitle(),
+                    course.getPriceCents(),
+                    course.getThumbnailUrl() // can be null
+                ));
+            }
+        }
+        return result;
     }
 }

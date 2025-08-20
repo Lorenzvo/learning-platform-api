@@ -97,6 +97,7 @@ public class CourseController {
                     long reviewCount = reviewRepo.countByCourseId(course.getId());
                     // Assemble the course detail DTO
                     return new CourseDetailDto(
+                            course.getId(),
                             course.getTitle(),
                             course.getPriceCents(),
                             course.getSlug(),

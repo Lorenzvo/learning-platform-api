@@ -5,6 +5,7 @@ import com.example.apibackend.module.ModuleDto;
 import com.example.apibackend.instructor.InstructorController.InstructorSummaryDto;
 
 public record CourseDetailDto(
+        Long id,
         String title,
         Integer price,
         String slug,
@@ -18,7 +19,7 @@ public record CourseDetailDto(
         long reviewCount
 ) {
     public CourseDetailDto(Course course) {
-        this(
+        this(course.getId(),
             course.getTitle(),
             course.getPriceCents(),
             course.getSlug(),
