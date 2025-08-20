@@ -29,4 +29,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     // Finds the most recent PENDING payment for a user and course (idempotency for rapid retries)
     Optional<Payment> findTopByUserIdAndCourseIdAndStatusOrderByCreatedAtDesc(Long userId, Long courseId, PaymentStatus status);
+
+    // Finds the most recent PENDING cart-wide payment for a user (course is null)
+    Optional<Payment> findTopByUserIdAndCourseIsNullAndStatusOrderByCreatedAtDesc(Long userId, PaymentStatus status);
 }

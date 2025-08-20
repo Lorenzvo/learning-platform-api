@@ -208,6 +208,28 @@ public class PaymentService {
         }
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        // Check for existing PENDING cart-wide payment for this user
+        Optional<Payment> existingCartPayment = paymentRepository.findTopByUserIdAndCourseIsNullAndStatusOrderByCreatedAtDesc(userId, Payment.PaymentStatus.PENDING);
+        if (existingCartPayment.isPresent()) {
+            Payment payment = existingCartPayment.get();
+            // Avoid variable conflict by renaming
+            var existingPaymentItems = paymentItemRepository.findAllByPaymentId(payment.getId());
+            List<CartCheckoutResponseDTO.CartPaymentItemDTO> dtoItems = new java.util.ArrayList<>();
+            for (var item : existingPaymentItems) {
+                Course course = item.getCourse();
+                dtoItems.add(new CartCheckoutResponseDTO.CartPaymentItemDTO(
+                    payment.getId(),
+                    fetchStripeClientSecret(payment.getGatewayTxnId()),
+                    payment.getGatewayTxnId(),
+                    course.getId(),
+                    course.getTitle(),
+                    course.getPriceCents(),
+                    course.getCurrency(),
+                    payment.getStatus().name()
+                ));
+            }
+            return new CartCheckoutResponseDTO(dtoItems);
+        }
         // Create a single Payment for the whole cart
         Payment payment = new Payment();
         payment.setUser(user);
