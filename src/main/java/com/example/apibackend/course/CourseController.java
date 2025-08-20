@@ -1,6 +1,7 @@
 package com.example.apibackend.course;
 
 import com.example.apibackend.instructor.Instructor;
+import com.example.apibackend.instructor.InstructorController;
 import com.example.apibackend.lesson.Lesson;
 import com.example.apibackend.module.Module;
 import com.example.apibackend.lesson.LessonDto;
@@ -33,7 +34,7 @@ import java.util.stream.Collectors;
 import com.example.apibackend.enrollment.EnrollmentRepository;
 import com.example.apibackend.enrollment.Enrollment;
 import com.example.apibackend.review.ReviewRepository;
-import com.example.apibackend.instructor.InstructorController;
+import com.example.apibackend.instructor.InstructorController.InstructorSummaryDto;
 
 /**
  * Public course catalog endpoints.
@@ -45,7 +46,6 @@ import com.example.apibackend.instructor.InstructorController;
 @RequestMapping("/api/courses")
 @Validated // Enables bean validation on query params
 public class CourseController {
-
     private final CourseRepository repo;
     private final ModuleRepository moduleRepo;
     private final LessonRepository lessonRepo;
@@ -126,22 +126,29 @@ public class CourseController {
 
     @GetMapping
     public Page<CourseSummaryDto> searchCourses(
-            @PageableDefault(page = 0, size = 12)
+            @PageableDefault(size = 12)
             @SortDefault.SortDefaults({@SortDefault(sort = "title")}) Pageable pageable,
             @RequestParam(required = false) @Size(max = 100) String q,
             @RequestParam(required = false) @Size(max = 20) String level,
             @RequestParam(required = false) Boolean published
     ) {
         Page<Course> page = repo.search(q, level, published, pageable);
-        return page.map(c -> new CourseSummaryDto(
+        return page.map(c -> {
+            Double avgRatingObj = reviewRepo.findAverageRatingByCourseId(c.getId());
+            double avgRating = avgRatingObj != null ? avgRatingObj : 0.0;
+            InstructorSummaryDto instructorSummary = c.getInstructor() != null ? InstructorSummaryDto.fromEntity(c.getInstructor()) : null;
+            return new CourseSummaryDto(
                 c.getId(),
                 c.getTitle(),
                 c.getSlug(),
-                c.getDescription() != null ? c.getDescription().substring(0, Math.min(80, c.getDescription().length())) : null,
+                c.getShortDescription(),
                 c.getPriceCents(),
                 c.getLevel(),
-                c.getIsActive()
-        ));
+                c.getIsActive(),
+                avgRating,
+                instructorSummary
+            );
+        });
     }
 
     @Value("${app.secret:defaultSecret}")

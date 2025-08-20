@@ -2,6 +2,7 @@ package com.example.apibackend.instructor;
 
 import com.example.apibackend.course.CourseRepository;
 import com.example.apibackend.course.CourseSummaryDto;
+import com.example.apibackend.review.ReviewRepository;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
 import java.util.List;
@@ -12,10 +13,12 @@ import java.util.stream.Collectors;
 public class InstructorController {
     private final InstructorRepository instructorRepo;
     private final CourseRepository courseRepo;
+    private final ReviewRepository reviewRepo;
 
-    public InstructorController(InstructorRepository instructorRepo, CourseRepository courseRepo) {
+    public InstructorController(InstructorRepository instructorRepo, CourseRepository courseRepo, ReviewRepository reviewRepo) {
         this.instructorRepo = instructorRepo;
         this.courseRepo = courseRepo;
+        this.reviewRepo = reviewRepo;
     }
 
     @GetMapping
@@ -34,10 +37,12 @@ public class InstructorController {
                         c.getId(),
                         c.getTitle(),
                         c.getSlug(),
-                        c.getDescription(),
+                        c.getShortDescription(),
                         c.getPriceCents(),
                         c.getLevel(),
-                        c.getIsActive()
+                        c.getIsActive(),
+                        reviewRepo.findAverageRatingByCourseId(c.getId()) != null ? reviewRepo.findAverageRatingByCourseId(c.getId()) : 0.0,
+                        InstructorSummaryDto.fromEntity(c.getInstructor())
                     ))
                     .collect(Collectors.toList());
                 return InstructorDetailDto.fromEntity(instructor, courses);
@@ -54,7 +59,7 @@ public class InstructorController {
         public static InstructorSummaryDto fromEntity(Instructor i) {
             InstructorSummaryDto dto = new InstructorSummaryDto();
             dto.id = i.getId();
-            dto.name = i.getUser().getEmail(); // Replace with name if available
+            dto.name = i.getName();
             dto.bio = i.getBio();
             dto.avatarUrl = i.getAvatarUrl();
             return dto;
@@ -66,7 +71,7 @@ public class InstructorController {
         public static InstructorDetailDto fromEntity(Instructor i, List<CourseSummaryDto> courses) {
             InstructorDetailDto dto = new InstructorDetailDto();
             dto.id = i.getId();
-            dto.name = i.getUser().getEmail(); // Replace with name if available
+            dto.name = i.getName();
             dto.bio = i.getBio();
             dto.avatarUrl = i.getAvatarUrl();
             dto.courses = courses;

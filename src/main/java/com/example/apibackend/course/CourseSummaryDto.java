@@ -1,8 +1,6 @@
 package com.example.apibackend.course;
 
-import jakarta.persistence.Column;
-import lombok.Setter;
-import java.util.List;
+import com.example.apibackend.instructor.InstructorController.InstructorSummaryDto;
 
 /**
  * DTO for paged course summaries in API responses.
@@ -15,5 +13,7 @@ public record CourseSummaryDto(
     String shortDesc,
     Integer priceCents,
     String level,
-    Boolean published
+    Boolean published,
+    double averageRating,
+    InstructorSummaryDto instructor
 ) {}

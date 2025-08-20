@@ -18,6 +18,9 @@ public class Instructor {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @Column
+    private String name;
+
     @Column(columnDefinition = "TEXT")
     private String bio;
 
