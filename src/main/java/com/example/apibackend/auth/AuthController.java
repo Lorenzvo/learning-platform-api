@@ -1,5 +1,6 @@
 package com.example.apibackend.auth;
 
+import com.example.apibackend.email.EmailService;
 import com.example.apibackend.user.User;
 import com.example.apibackend.user.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -8,12 +9,21 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Cookie;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.ResponseEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.security.SecureRandom;
+import java.time.Instant;
 import java.time.LocalDateTime;
-import org.springframework.beans.factory.annotation.Autowired;
-import com.example.apibackend.email.EmailService;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -23,13 +33,15 @@ public class AuthController {
     private final JwtUtil jwtUtil;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
     private final PasswordResetTokenRepository passwordResetTokenRepo;
-    @Autowired
-    private EmailService emailService;
+    private final RefreshTokenRepository refreshTokenRepo;
+    private final EmailService emailService;
 
-    public AuthController(UserRepository userRepo, JwtUtil jwtUtil, PasswordResetTokenRepository passwordResetTokenRepo) {
+    public AuthController(UserRepository userRepo, JwtUtil jwtUtil, PasswordResetTokenRepository passwordResetTokenRepo, RefreshTokenRepository refreshTokenRepo, EmailService emailService) {
         this.userRepo = userRepo;
         this.jwtUtil = jwtUtil;
         this.passwordResetTokenRepo = passwordResetTokenRepo;
+        this.refreshTokenRepo = refreshTokenRepo;
+        this.emailService = emailService;
     }
 
     /**
@@ -59,8 +71,7 @@ public class AuthController {
      */
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req) {
-        // Only allow login for users who are not soft-deleted
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req, HttpServletResponse response) {
         User user = userRepo.findByEmailAndDeletedAtIsNull(req.email).orElse(null);
         log.info("Login attempt: email={}, foundUser={}, hash={}", req.email, user != null, user != null ? user.getPasswordHash() : "null");
         if (user == null || !passwordEncoder.matches(req.password, user.getPasswordHash())) {
@@ -68,8 +79,50 @@ public class AuthController {
             return ResponseEntity.status(401).body("Invalid credentials");
         }
         String token = jwtUtil.createToken(user.getId(), user.getEmail(), user.getRole());
+        // Generate refresh token
+        String refreshToken = generateToken();
+        Instant expiresAt = Instant.now().plusSeconds(7 * 24 * 60 * 60); // 7 days
+        refreshTokenRepo.save(new RefreshToken(refreshToken, user.getId(), expiresAt));
+        // Set refresh token as HTTP-only cookie
+        Cookie cookie = new Cookie("refreshToken", refreshToken);
+        cookie.setHttpOnly(true);
+        cookie.setPath("/");
+        cookie.setMaxAge(7 * 24 * 60 * 60);
+        response.addCookie(cookie);
         log.info("Login success: email={}, userId={}, role={}", user.getEmail(), user.getId(), user.getRole());
         return ResponseEntity.ok(new JwtResponse(token));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refreshToken(HttpServletRequest request, HttpServletResponse response) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) return ResponseEntity.status(401).body("No refresh token");
+        String refreshToken = null;
+        for (Cookie c : cookies) {
+            if ("refreshToken".equals(c.getName())) {
+                refreshToken = c.getValue();
+                break;
+            }
+        }
+        if (refreshToken == null) return ResponseEntity.status(401).body("No refresh token");
+        RefreshToken tokenEntity = refreshTokenRepo.findByToken(refreshToken).orElse(null);
+        if (tokenEntity == null || tokenEntity.getExpiresAt().isBefore(Instant.now())) {
+            return ResponseEntity.status(401).body("Invalid or expired refresh token");
+        }
+        User user = userRepo.findById(tokenEntity.getUserId()).orElse(null);
+        if (user == null) return ResponseEntity.status(401).body("User not found");
+        String newAccessToken = jwtUtil.createToken(user.getId(), user.getEmail(), user.getRole());
+        // Optionally rotate refresh token
+        String newRefreshToken = generateToken();
+        tokenEntity.setToken(newRefreshToken);
+        tokenEntity.setExpiresAt(Instant.now().plusSeconds(7 * 24 * 60 * 60));
+        refreshTokenRepo.save(tokenEntity);
+        Cookie cookie = new Cookie("refreshToken", newRefreshToken);
+        cookie.setHttpOnly(true);
+        cookie.setPath("/");
+        cookie.setMaxAge(7 * 24 * 60 * 60);
+        response.addCookie(cookie);
+        return ResponseEntity.ok(new JwtResponse(newAccessToken));
     }
 
     /**
@@ -128,15 +181,29 @@ public class AuthController {
      * Logout endpoint: for JWT, just return success (client deletes token). Optionally log event.
      */
     @PostMapping("/logout")
-    public ResponseEntity<?> logout() {
-        log.info("User logged out");
-        return ResponseEntity.ok().body("Logged out successfully");
+    public ResponseEntity<?> logout(HttpServletRequest request, HttpServletResponse response) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            for (Cookie c : cookies) {
+                if ("refreshToken".equals(c.getName())) {
+                    refreshTokenRepo.deleteByToken(c.getValue());
+                    // Clear cookie
+                    Cookie clearCookie = new Cookie("refreshToken", "");
+                    clearCookie.setHttpOnly(true);
+                    clearCookie.setPath("/");
+                    clearCookie.setMaxAge(0);
+                    response.addCookie(clearCookie);
+                }
+            }
+        }
+        return ResponseEntity.ok().build();
     }
 
     // Helper: generate a secure random token (32 bytes hex)
     private String generateToken() {
+        SecureRandom random = new SecureRandom();
         byte[] bytes = new byte[32];
-        new SecureRandom().nextBytes(bytes);
+        random.nextBytes(bytes);
         StringBuilder sb = new StringBuilder();
         for (byte b : bytes) sb.append(String.format("%02x", b));
         return sb.toString();
