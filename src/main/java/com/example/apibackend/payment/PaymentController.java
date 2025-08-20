@@ -35,18 +35,20 @@ public class PaymentController {
 
     /**
      * Handles cart checkout for multi-course purchase.
-     * Accepts user token, finds user's cart, and creates one PENDING payment per course.
-     * Returns array of payment DTOs. Multiple payments are acceptable for MVP simplicity.
-     * <p>
-     * In future, a payment_items table would allow a single charge for all cart items.
+     * Accepts user token, finds user's cart, and creates a single cart-wide payment intent.
+     * Returns a JSON object with clientSecret for the cart-wide payment intent.
      */
     @PostMapping("/cart")
-    public ResponseEntity<CartCheckoutResponseDTO> checkoutCart(
+    public ResponseEntity<?> checkoutCart(
             @AuthenticationPrincipal User user
     ) {
         Long userId = user.getId();
         CartCheckoutResponseDTO dto = paymentService.createOrGetPendingPaymentsForCart(userId);
-        return ResponseEntity.ok(dto);
+        // Return only the top-level clientSecret for the cart-wide payment intent
+        String clientSecret = null;
+        if (dto != null && dto.getItems() != null && !dto.getItems().isEmpty()) {
+            clientSecret = dto.getItems().get(0).getClientSecret();
+        }
+        return ResponseEntity.ok(java.util.Map.of("clientSecret", clientSecret));
     }
 }
-
