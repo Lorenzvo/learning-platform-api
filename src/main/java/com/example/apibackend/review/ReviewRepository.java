@@ -9,7 +9,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     Page<Review> findByCourseId(Long courseId, Pageable pageable);
     List<Review> findByCourseId(Long courseId);
     long countByCourseId(Long courseId);
-
+    
     // Returns average rating for a course (custom JPQL)
     @org.springframework.data.jpa.repository.Query("SELECT AVG(r.rating) FROM Review r WHERE r.course.id = :courseId")
     Double findAverageRatingByCourseId(@org.springframework.data.repository.query.Param("courseId") Long courseId);

@@ -64,4 +64,11 @@ public class Enrollment {
     @Column(name = "revoked_at")
     private Instant revokedAt;
 
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = Instant.now();
+        }
+    }
+
 }

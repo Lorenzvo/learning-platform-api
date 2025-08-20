@@ -42,7 +42,7 @@ security:
   jwt:
     secret: ${JWT_SECRET}  # JWT secret key (use a strong random key in production)
     issuer: "learning-platform"
-    accessTokenTtlMinutes: 15
+    accessTokenTtlMinutes: 60
 #
 stripe:
   secretKey: ${STRIPE_SECRET_KEY}  # Stripe test secret key (never commit real keys)

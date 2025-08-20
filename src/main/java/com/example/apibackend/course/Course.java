@@ -94,6 +94,11 @@ public class Course {
             String plain = description.replaceAll("\\s+", " ").trim();
             shortDescription = plain.length() <= 180 ? plain : plain.substring(0, 177) + "...";
         }
+
+        if (createdAt == null) {
+            createdAt = Instant.now();
+        }
+
         if (currency != null) currency = currency.toUpperCase();
     }
 }

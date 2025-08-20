@@ -5,7 +5,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Date;
@@ -50,38 +49,32 @@ public class AdminEnrollmentController {
      */
     @GetMapping("/reports/enrollments.csv")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<StreamingResponseBody> exportEnrollmentsCsv(
+    public ResponseEntity<String> exportEnrollmentsCsv(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
-        // Convert LocalDate to Instant for filtering
-        Date fromDate = Date.from(from.atStartOfDay().toInstant(ZoneOffset.UTC));
-        Date toDate = Date.from(to.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC));
-        // StreamingResponseBody writes directly to output stream
-        StreamingResponseBody stream = out -> {
-            // CSV header
-            out.write("enrollmentId,userEmail,courseSlug,enrolledAt,status\n".getBytes());
-            // Stream enrollments in date range
-            enrollmentRepo.findAll().stream()
-                .filter(e -> e.getCreatedAt() != null &&
-                    !e.getCreatedAt().isBefore(from.atStartOfDay().toInstant(ZoneOffset.UTC)) &&
-                    e.getCreatedAt().isBefore(to.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC)))
-                .forEach(e -> {
-                    try {
-                        String line = String.format("%d,%s,%s,%s,%s\n",
-                                e.getId(),
-                                e.getUser().getEmail(),
-                                e.getCourse().getSlug(),
-                                e.getCreatedAt(),
-                                e.getStatus().name());
-                        out.write(line.getBytes());
-                    } catch (Exception ex) { /* log or ignore */ }
-                });
-        };
+        StringBuilder csv = new StringBuilder();
+        csv.append("enrollmentId,userEmail,courseSlug,enrolledAt,status\n");
+        enrollmentRepo.findAll().stream()
+            .filter(e -> e.getCreatedAt() != null &&
+                !e.getCreatedAt().isBefore(from.atStartOfDay().toInstant(ZoneOffset.UTC)) &&
+                e.getCreatedAt().isBefore(to.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC)))
+            .forEach(e -> {
+                String userEmail = e.getUser() != null ? e.getUser().getEmail() : "";
+                String courseSlug = e.getCourse() != null ? e.getCourse().getSlug() : "";
+                String enrolledAt = e.getCreatedAt() != null ? e.getCreatedAt().toString() : "";
+                String status = e.getStatus() != null ? e.getStatus().name() : "";
+                csv.append(String.format("%d,%s,%s,%s,%s\n",
+                    e.getId(),
+                    userEmail,
+                    courseSlug,
+                    enrolledAt,
+                    status));
+            });
         return ResponseEntity.ok()
-                .header("Content-Disposition", "attachment; filename=enrollments.csv")
-                .header("Content-Type", "text/csv")
-                .body(stream);
+            .header("Content-Disposition", "attachment; filename=enrollments.csv")
+            .header("Content-Type", "text/csv")
+            .body(csv.toString());
     }
 
     /**
@@ -89,15 +82,24 @@ public class AdminEnrollmentController {
      * Includes userId for admin visibility.
      */
     public static class EnrollmentDto {
-        public final Long id;
-        public final Long userId;
-        public final Long courseId;
-        public final String status;
+        private Long id;
+        private String date; // or LocalDateTime
+        private String userEmail;
+        private String courseTitle;
+        private String status;
+
         public EnrollmentDto(Enrollment e) {
             this.id = e.getId();
-            this.userId = e.getUser().getId();
-            this.courseId = e.getCourse().getId();
+            this.date = e.getCreatedAt().toString(); // assuming Enrollment.getCreatedAt() returns a Date or LocalDateTime
+            this.userEmail = e.getUser().getEmail(); // assuming Enrollment.getUser().getEmail()
+            this.courseTitle = e.getCourse().getTitle(); // assuming Enrollment.getCourse().getTitle()
             this.status = e.getStatus().toString();
         }
+
+        public Long getId() { return id; }
+        public String getDate() { return date; }
+        public String getUserEmail() { return userEmail; }
+        public String getCourseTitle() { return courseTitle; }
+        public String getStatus() { return status; }
     }
 }

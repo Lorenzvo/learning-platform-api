@@ -46,4 +46,11 @@ public class User {
     @Column(name = "deleted_at")
     private Instant deletedAt; // audit timestamp for soft deletion
 
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = Instant.now();
+        }
+    }
+
 }

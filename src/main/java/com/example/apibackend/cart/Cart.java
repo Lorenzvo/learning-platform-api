@@ -27,7 +27,13 @@ public class Cart {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = Instant.now();
+        }
+    }
+
     // Getters and setters
     // ...
 }
-
