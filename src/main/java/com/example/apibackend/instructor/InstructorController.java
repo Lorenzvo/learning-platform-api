@@ -42,6 +42,7 @@ public class InstructorController {
                         c.getLevel(),
                         c.getIsActive(),
                         reviewRepo.findAverageRatingByCourseId(c.getId()) != null ? reviewRepo.findAverageRatingByCourseId(c.getId()) : 0.0,
+                        c.getThumbnailUrl(),
                         InstructorSummaryDto.fromEntity(c.getInstructor())
                     ))
                     .collect(Collectors.toList());

@@ -15,5 +15,6 @@ public record CourseSummaryDto(
     String level,
     Boolean published,
     double averageRating,
+    String thumbnailUrl,
     InstructorSummaryDto instructor
 ) {}

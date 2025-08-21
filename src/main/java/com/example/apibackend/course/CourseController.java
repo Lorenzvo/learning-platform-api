@@ -29,7 +29,9 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.nio.charset.StandardCharsets;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import com.example.apibackend.enrollment.EnrollmentRepository;
 import com.example.apibackend.enrollment.Enrollment;
@@ -125,8 +127,8 @@ public class CourseController {
      */
 
     @GetMapping
-    public Page<CourseSummaryDto> searchCourses(
-            @PageableDefault(size = 12)
+    public Map<String, Object> searchCourses(
+            @PageableDefault(size = 6)
             @SortDefault.SortDefaults({@SortDefault(sort = "title")}) Pageable pageable,
             @RequestParam(required = false) @Size(max = 100) String q,
             @RequestParam(required = false) @Size(max = 20) String level,
@@ -134,7 +136,6 @@ public class CourseController {
             @RequestParam(required = false) Double minRating
     ) {
         Page<Course> page = repo.search(q, level, published, pageable);
-        // Map entities to DTOs with average rating and instructor summary
         Page<CourseSummaryDto> dtoPage = page.map(c -> {
             Double avgRatingObj = reviewRepo.findAverageRatingByCourseId(c.getId());
             double avgRating = avgRatingObj != null ? avgRatingObj : 0.0;
@@ -148,17 +149,17 @@ public class CourseController {
                 c.getLevel(),
                 c.getIsActive(),
                 avgRating,
+                c.getThumbnailUrl(),
                 instructorSummary
             );
         });
-        // Filter by minRating if provided
-        if (minRating != null) {
-            List<CourseSummaryDto> filtered = dtoPage.stream()
-                .filter(dto -> dto.averageRating() >= minRating)
-                .collect(Collectors.toList());
-            return new org.springframework.data.domain.PageImpl<>(filtered, pageable, filtered.size());
-        }
-        return dtoPage;
+        Map<String, Object> response = new HashMap<>();
+        response.put("content", dtoPage.getContent());
+        response.put("page", dtoPage.getNumber());
+        response.put("size", dtoPage.getSize());
+        response.put("totalPages", dtoPage.getTotalPages());
+        response.put("totalElements", dtoPage.getTotalElements());
+        return response;
     }
 
     @Value("${app.secret:defaultSecret}")
