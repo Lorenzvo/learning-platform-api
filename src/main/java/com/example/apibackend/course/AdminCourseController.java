@@ -21,6 +21,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Stub admin endpoint for security testing.
@@ -32,6 +34,8 @@ public class AdminCourseController {
     private final CourseRepository courseRepo;
     private final EnrollmentRepository enrollmentRepo;
     private final PaymentRepository paymentRepo;
+
+    private static final Logger logger = LoggerFactory.getLogger(AdminCourseController.class);
 
     public AdminCourseController(CourseRepository courseRepo, EnrollmentRepository enrollmentRepo, PaymentRepository paymentRepo) {
         this.courseRepo = courseRepo;
@@ -59,9 +63,11 @@ public class AdminCourseController {
 
     @PostMapping
     public ResponseEntity<?> createCourse(@Validated @RequestBody CreateCourseRequest req) {
+        logger.info("Admin attempting to create course: title={}, slug={}", req.title, req.slug);
         // Validation groups can be used for different create/update scenarios (not shown here)
         // Common failure: duplicate slug (should be unique)
         if (courseRepo.existsBySlug(req.slug)) {
+            logger.warn("Course creation failed: slug '{}' already exists", req.slug);
             return ResponseEntity.status(409).body("Course slug already exists");
         }
         Course course = new Course();
@@ -75,6 +81,7 @@ public class AdminCourseController {
         course.setThumbnailUrl(req.thumbnailUrl);
         course.setIsActive(req.published);
         courseRepo.save(course);
+        logger.info("Course created successfully: id={}, slug={}", course.getId(), course.getSlug());
         // Return CourseDetailDto (assume constructor from Course)
         return ResponseEntity.status(201).body(new CourseDetailDto(course));
     }
@@ -95,28 +102,32 @@ public class AdminCourseController {
 
     @PutMapping("/{id}")
     public ResponseEntity<?> updateCourse(@PathVariable Long id, @Validated @RequestBody UpdateCourseRequest req) {
+        logger.info("Admin attempting to update course: id={}, slug={}", id, req.getSlug());
         var courseOpt = courseRepo.findById(id);
         if (courseOpt.isEmpty()) {
+            logger.warn("Course update failed: id '{}' not found", id);
             return ResponseEntity.notFound().build();
         }
         var course = courseOpt.get();
-        // Validate slug uniqueness (409 Conflict if duplicate)
+        // Update editable fields
+        if (req.getTitle() != null) course.setTitle(req.getTitle());
         if (req.getSlug() != null && !req.getSlug().equals(course.getSlug())) {
             boolean slugExists = courseRepo.existsBySlug(req.getSlug());
             if (slugExists) {
-                // Slug must be unique for SEO and routing
                 return ResponseEntity.status(409).body("Slug already exists");
             }
             course.setSlug(req.getSlug());
         }
-        // Update editable fields
-        if (req.getTitle() != null) course.setTitle(req.getTitle());
-        if (req.getShortDescription() != null) course.setShortDescription(req.getShortDescription());
-        if (req.getThumbnailUrl() != null) course.setThumbnailUrl(req.getThumbnailUrl());
         if (req.getPriceCents() != null) course.setPriceCents(req.getPriceCents());
         if (req.getCurrency() != null) course.setCurrency(req.getCurrency());
+        if (req.getLevel() != null) course.setLevel(req.getLevel());
+        if (req.getShortDescription() != null) course.setShortDescription(req.getShortDescription());
+        if (req.getDescription() != null) course.setDescription(req.getDescription());
+        if (req.getThumbnailUrl() != null) course.setThumbnailUrl(req.getThumbnailUrl());
+        if (req.getPublished() != null) course.setIsActive(req.getPublished());
         // ...add more editable fields as needed...
         courseRepo.save(course);
+        logger.info("Course updated successfully: id={}, slug={}", course.getId(), course.getSlug());
         // Return updated CourseDetailDto
         return ResponseEntity.ok(new CourseDetailDto(course));
     }
@@ -194,6 +205,9 @@ public class AdminCourseController {
         private String thumbnailUrl;
         private Integer priceCents;
         private String currency;
+        private String level;
+        private String description;
+        private Boolean published;
         // ...add more editable fields as needed...
 
     }

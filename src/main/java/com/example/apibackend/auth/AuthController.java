@@ -88,7 +88,13 @@ public class AuthController {
         cookie.setHttpOnly(true);
         cookie.setPath("/");
         cookie.setMaxAge(7 * 24 * 60 * 60);
+        cookie.setSecure(true); // Required for SameSite=None on HTTPS
         response.addCookie(cookie);
+        // Manually set SameSite=None using header (since Cookie.setSameSite is not available)
+        response.addHeader("Set-Cookie", String.format(
+            "refreshToken=%s; Max-Age=%d; Path=/; HttpOnly; Secure; SameSite=None",
+            refreshToken, 7 * 24 * 60 * 60
+        ));
         log.info("Login success: email={}, userId={}, role={}", user.getEmail(), user.getId(), user.getRole());
         return ResponseEntity.ok(new JwtResponse(token));
     }
@@ -121,7 +127,13 @@ public class AuthController {
         cookie.setHttpOnly(true);
         cookie.setPath("/");
         cookie.setMaxAge(7 * 24 * 60 * 60);
+        cookie.setSecure(true); // Required for SameSite=None on HTTPS
         response.addCookie(cookie);
+        // Manually set SameSite=None using header (since Cookie.setSameSite is not available)
+        response.addHeader("Set-Cookie", String.format(
+            "refreshToken=%s; Max-Age=%d; Path=/; HttpOnly; Secure; SameSite=None",
+            newRefreshToken, 7 * 24 * 60 * 60
+        ));
         return ResponseEntity.ok(new JwtResponse(newAccessToken));
     }
 

@@ -135,24 +135,37 @@ public class CourseController {
             @RequestParam(required = false) Boolean published,
             @RequestParam(required = false) Double minRating
     ) {
-        Page<Course> page = repo.search(q, level, published, pageable);
-        Page<CourseSummaryDto> dtoPage = page.map(c -> {
-            Double avgRatingObj = reviewRepo.findAverageRatingByCourseId(c.getId());
-            double avgRating = avgRatingObj != null ? avgRatingObj : 0.0;
-            InstructorSummaryDto instructorSummary = c.getInstructor() != null ? InstructorSummaryDto.fromEntity(c.getInstructor()) : null;
-            return new CourseSummaryDto(
-                c.getId(),
-                c.getTitle(),
-                c.getSlug(),
-                c.getShortDescription(),
-                c.getPriceCents(),
-                c.getLevel(),
-                c.getIsActive(),
-                avgRating,
-                c.getThumbnailUrl(),
-                instructorSummary
-            );
-        });
+        Page<Course> page = repo.search(q, level, published, Pageable.unpaged());
+        // Only include active courses
+        List<Course> allActiveCourses = page.getContent().stream().filter(c -> c.getIsActive()).collect(Collectors.toList());
+        int totalActive = allActiveCourses.size();
+        // Now paginate the active courses manually
+        int pageNumber = pageable.getPageNumber();
+        int pageSize = pageable.getPageSize();
+        int fromIndex = Math.min(pageNumber * pageSize, totalActive);
+        int toIndex = Math.min(fromIndex + pageSize, totalActive);
+        List<Course> pagedActiveCourses = allActiveCourses.subList(fromIndex, toIndex);
+        Page<CourseSummaryDto> dtoPage = new org.springframework.data.domain.PageImpl<>(
+            pagedActiveCourses.stream().map(c -> {
+                Double avgRatingObj = reviewRepo.findAverageRatingByCourseId(c.getId());
+                double avgRating = avgRatingObj != null ? avgRatingObj : 0.0;
+                InstructorSummaryDto instructorSummary = c.getInstructor() != null ? InstructorSummaryDto.fromEntity(c.getInstructor()) : null;
+                return new CourseSummaryDto(
+                    c.getId(),
+                    c.getTitle(),
+                    c.getSlug(),
+                    c.getShortDescription(),
+                    c.getPriceCents(),
+                    c.getLevel(),
+                    c.getIsActive(),
+                    avgRating,
+                    c.getThumbnailUrl(),
+                    instructorSummary
+                );
+            }).collect(Collectors.toList()),
+            pageable,
+            totalActive
+        );
         Map<String, Object> response = new HashMap<>();
         response.put("content", dtoPage.getContent());
         response.put("page", dtoPage.getNumber());
