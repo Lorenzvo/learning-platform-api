@@ -14,11 +14,13 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import java.util.List;
 
 /**
  * Stub admin endpoint for security testing.
@@ -38,9 +40,21 @@ public class AdminCourseController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getAdminCourses() {
-        // Stub: just return 200 OK for security test
-        return ResponseEntity.ok().build();
+    public ResponseEntity<?> getAdminCourses(
+            @org.springframework.data.web.PageableDefault(size = 6) org.springframework.data.domain.Pageable pageable,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String level,
+            @RequestParam(required = false) Boolean published
+    ) {
+        org.springframework.data.domain.Page<Course> page = courseRepo.search(q, level, published, pageable);
+        java.util.List<AdminCourseDto> dtos = page.getContent().stream().map(AdminCourseDto::fromEntity).toList();
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        response.put("content", dtos);
+        response.put("page", page.getNumber());
+        response.put("size", page.getSize());
+        response.put("totalPages", page.getTotalPages());
+        response.put("totalElements", page.getTotalElements());
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping
@@ -182,5 +196,44 @@ public class AdminCourseController {
         private String currency;
         // ...add more editable fields as needed...
 
+    }
+
+    public static class AdminCourseDto {
+        public final Long id;
+        public final String title;
+        public final String slug;
+        public final String shortDescription;
+        public final String description;
+        public final Integer priceCents;
+        public final String currency;
+        public final String level;
+        public final Boolean isActive;
+        public final String thumbnailUrl;
+        public AdminCourseDto(Long id, String title, String slug, String shortDescription, String description, Integer priceCents, String currency, String level, Boolean isActive, String thumbnailUrl) {
+            this.id = id;
+            this.title = title;
+            this.slug = slug;
+            this.shortDescription = shortDescription;
+            this.description = description;
+            this.priceCents = priceCents;
+            this.currency = currency;
+            this.level = level;
+            this.isActive = isActive;
+            this.thumbnailUrl = thumbnailUrl;
+        }
+        public static AdminCourseDto fromEntity(Course c) {
+            return new AdminCourseDto(
+                c.getId(),
+                c.getTitle(),
+                c.getSlug(),
+                c.getShortDescription(),
+                c.getDescription(),
+                c.getPriceCents(),
+                c.getCurrency(),
+                c.getLevel(),
+                c.getIsActive(),
+                c.getThumbnailUrl()
+            );
+        }
     }
 }
