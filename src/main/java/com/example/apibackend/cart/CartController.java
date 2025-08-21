@@ -45,4 +45,13 @@ public class CartController {
         var items = cartService.getCartItems(user.getId());
         return ResponseEntity.ok(items);
     }
+
+    /**
+     * Clears all items from the user's cart.
+     */
+    @PostMapping("/clear")
+    public ResponseEntity<?> clearCart(@AuthenticationPrincipal User user) {
+        cartService.clearCart(user.getId());
+        return ResponseEntity.ok().body("Cart cleared");
+    }
 }

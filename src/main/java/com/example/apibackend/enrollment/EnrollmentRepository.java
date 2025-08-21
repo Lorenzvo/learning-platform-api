@@ -20,6 +20,9 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
     // Only return enrollments for users who are not soft-deleted
     List<Enrollment> findByUserIdAndUser_DeletedAtIsNull(Long userId);
 
+    // Only return enrollments for users who are not soft-deleted, paginated
+    org.springframework.data.domain.Page<Enrollment> findByUserIdAndUser_DeletedAtIsNull(Long userId, org.springframework.data.domain.Pageable pageable);
+
     long countByUserId(Long id);
 
     long countByUserIdAndUser_DeletedAtIsNull(Long userId);

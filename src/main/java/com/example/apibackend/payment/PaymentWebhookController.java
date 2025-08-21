@@ -1,5 +1,6 @@
 package com.example.apibackend.payment;
 
+import com.example.apibackend.cart.CartService;
 import com.example.apibackend.enrollment.Enrollment;
 import com.example.apibackend.enrollment.EnrollmentRepository;
 import com.example.apibackend.user.User;
@@ -38,6 +39,7 @@ public class PaymentWebhookController {
     private final EnrollmentRepository enrollmentRepo;
     private final EmailService emailService;
     private final PaymentItemRepository paymentItemRepository;
+    private final CartService cartService;
     private static final Logger log = LoggerFactory.getLogger(PaymentWebhookController.class);
 
     // Shared secret for signature verification (stub for now)
@@ -122,6 +124,7 @@ public class PaymentWebhookController {
                     }
                     emailService.sendPaymentReceipt(payment.getUser(), item.getCourse(), payment);
                 }
+                cartService.clearCart(userId);
             } else if (payment.getCourse() != null) {
                 // Single course payment fallback
                 Long courseId = payment.getCourse().getId();
@@ -143,6 +146,7 @@ public class PaymentWebhookController {
                     }
                 }
                 emailService.sendPaymentReceipt(payment.getUser(), payment.getCourse(), payment);
+                cartService.clearCart(userId);
             }
             log.info("Payment marked SUCCESS and enrollment(s) created if needed");
             return ResponseEntity.ok("Payment processed and enrollment updated");

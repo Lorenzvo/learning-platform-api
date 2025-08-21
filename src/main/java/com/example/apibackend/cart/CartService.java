@@ -92,4 +92,25 @@ public class CartService {
         }
         return result;
     }
+
+    /**
+     * Clears all items from the user's cart.
+     */
+    @Transactional
+    public void clearCart(Long userId) {
+        Cart cart = cartRepository.findByUserId(userId).orElse(null);
+        if (cart != null) {
+            logger.info("Before clear: cart items count = {}", cart.getItems() != null ? cart.getItems().size() : 0);
+            // Remove all items from the cart's items list and save the cart (triggers orphan removal)
+            if (cart.getItems() != null && !cart.getItems().isEmpty()) {
+                cart.getItems().clear();
+                cartRepository.save(cart);
+                logger.info("After clear: cart items count = {}", cart.getItems().size());
+            }
+            // Also run bulk delete for safety (in case items are not loaded in memory)
+            cartItemRepository.deleteByCartId(cart.getId());
+            logger.info("After bulk delete: cart items count = {}", cartItemRepository.findByCartId(cart.getId()).size());
+            logger.info("Cleared all items from cart for user {} (orphanRemoval + bulk delete)", userId);
+        }
+    }
 }

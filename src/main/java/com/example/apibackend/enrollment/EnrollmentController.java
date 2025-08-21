@@ -29,18 +29,26 @@ public class EnrollmentController {
 
     /**
      * GET /api/enrollments/me
-     * Returns the current user's enrollments as DTOs.
+     * Returns the current user's enrollments as paginated DTOs.
      * User ID is derived from JWT principal, not from request body or params.
      */
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<EnrollmentDto>> getMyEnrollments(Authentication authentication) {
-        // Extract user ID from JWT principal
+    public ResponseEntity<?> getMyEnrollments(
+            Authentication authentication,
+            @org.springframework.data.web.PageableDefault(size = 6) org.springframework.data.domain.Pageable pageable
+    ) {
         User principal = (User) authentication.getPrincipal();
         Long userId = principal.getId();
-        List<Enrollment> enrollments = enrollmentRepo.findByUserIdAndUser_DeletedAtIsNull(userId);
-        List<EnrollmentDto> dtos = enrollments.stream().map(EnrollmentDto::new).collect(Collectors.toList());
-        return ResponseEntity.ok(dtos);
+        org.springframework.data.domain.Page<Enrollment> enrollmentsPage = enrollmentRepo.findByUserIdAndUser_DeletedAtIsNull(userId, pageable);
+        java.util.List<EnrollmentDto> dtos = enrollmentsPage.getContent().stream().map(EnrollmentDto::new).collect(java.util.stream.Collectors.toList());
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        response.put("content", dtos);
+        response.put("page", enrollmentsPage.getNumber());
+        response.put("size", enrollmentsPage.getSize());
+        response.put("totalPages", enrollmentsPage.getTotalPages());
+        response.put("totalElements", enrollmentsPage.getTotalElements());
+        return ResponseEntity.ok(response);
     }
 
     /**
