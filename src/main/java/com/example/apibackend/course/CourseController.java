@@ -36,6 +36,8 @@ import java.util.stream.Collectors;
 import com.example.apibackend.enrollment.EnrollmentRepository;
 import com.example.apibackend.enrollment.Enrollment;
 import com.example.apibackend.review.ReviewRepository;
+import com.example.apibackend.review.Review;
+import com.example.apibackend.review.ReviewDto;
 import com.example.apibackend.instructor.InstructorController.InstructorSummaryDto;
 
 /**
@@ -85,7 +87,8 @@ public class CourseController {
                                 lesson.getTitle(),
                                 lesson.getType().name(),
                                 lesson.getDurationSeconds(),
-                                lesson.isDemo()
+                                lesson.isDemo(),
+                                lesson.getContentUrl()
                         )).collect(Collectors.toList());
                         return new ModuleDto(
                                 module.getId(),
@@ -97,6 +100,9 @@ public class CourseController {
                     // Fetch reviews summary
                     Double avgRating = reviewRepo.findAverageRatingByCourseId(course.getId());
                     long reviewCount = reviewRepo.countByCourseId(course.getId());
+                    // Fetch 5 most recent reviews
+                    List<Review> recentReviews = reviewRepo.findTop5ByCourseIdOrderByCreatedAtDesc(course.getId());
+                    List<ReviewDto> recentReviewDtos = recentReviews.stream().map(ReviewDto::fromEntity).collect(Collectors.toList());
                     // Assemble the course detail DTO
                     return new CourseDetailDto(
                             course.getId(),
@@ -110,7 +116,8 @@ public class CourseController {
                             moduleDtos,
                             instructorDto,
                             avgRating != null ? avgRating : 0.0,
-                            reviewCount
+                            reviewCount,
+                            recentReviewDtos
                     );
                 })
                 .map(ResponseEntity::ok)
@@ -321,7 +328,8 @@ public class CourseController {
             lesson.getTitle(),
             lesson.getType().name(),
             lesson.getDurationSeconds(),
-            lesson.isDemo()
+            lesson.isDemo(),
+                lesson.getContentUrl()
         ));
         return ResponseEntity.ok(dtos);
     }

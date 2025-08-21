@@ -5,5 +5,6 @@ public record LessonDto(
         String title,
         String type,
         Integer durationSeconds,
-        boolean isDemo
+        boolean isDemo,
+        String contentUrl
 ) {}

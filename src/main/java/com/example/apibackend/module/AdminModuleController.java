@@ -193,7 +193,7 @@ public class AdminModuleController {
         return new ModuleDto(m.getId(), m.getTitle(), m.getPosition(), lessons);
     }
     private LessonDto toDto(Lesson l) {
-        return new LessonDto(l.getId(), l.getTitle(), l.getType().name(), l.getDurationSeconds(), l.isDemo());
+        return new LessonDto(l.getId(), l.getTitle(), l.getType().name(), l.getDurationSeconds(), l.isDemo(), l.getContentUrl());
     }
 
     // --- Comments ---

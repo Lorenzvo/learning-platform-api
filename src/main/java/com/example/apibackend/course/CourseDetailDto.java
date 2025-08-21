@@ -3,6 +3,7 @@ package com.example.apibackend.course;
 import java.util.List;
 import com.example.apibackend.module.ModuleDto;
 import com.example.apibackend.instructor.InstructorController.InstructorSummaryDto;
+import com.example.apibackend.review.ReviewDto;
 
 public record CourseDetailDto(
         Long id,
@@ -16,7 +17,8 @@ public record CourseDetailDto(
         List<ModuleDto> modules,
         InstructorSummaryDto instructor,
         double avgRating,
-        long reviewCount
+        long reviewCount,
+        List<ReviewDto> recentReviews
 ) {
     public CourseDetailDto(Course course) {
         this(course.getId(),
@@ -30,7 +32,8 @@ public record CourseDetailDto(
             List.of(), // No modules for admin create response
             null,
             0.0,
-            0L
+            0L,
+            List.of() // No reviews for admin create response
         );
     }
 }

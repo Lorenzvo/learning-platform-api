@@ -61,7 +61,7 @@ public class ReviewController {
         review.setComment(req.comment);
         review.setCreatedAt(Instant.now());
         reviewRepo.save(review);
-        return ResponseEntity.status(201).body(review);
+        return ResponseEntity.status(201).body(new ReviewDto(review));
     }
 
     @DeleteMapping("/{reviewId}")
