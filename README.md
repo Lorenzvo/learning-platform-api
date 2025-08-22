@@ -1,20 +1,22 @@
-Overview
+# Learning Platform API
 
-Learning Platform API — a Spring Boot REST API powering an e‑learning app: authentication (JWT), course catalogue, modules/lessons, carts, Stripe payments (single & cart), webhooks, enrollments, reviews, and admin operations. Data stored in MySQL, migrations via Flyway.
+Spring Boot REST API powering an e-learning app: authentication (JWT), course catalogue, modules/lessons, carts, Stripe payments (single & cart), webhooks, enrollments, reviews, and admin operations. Data stored in MySQL, migrations via Flyway.
 
-Tech Stack
+---
 
-Java 17+, Spring Boot
+## Tech Stack
 
-MySQL 8, Flyway
+- **Java 17+**, **Spring Boot**
+- **MySQL 8**, **Flyway**
+- **Stripe** (PaymentIntents + webhooks)
+- **JWT auth** (bcrypt hashed passwords)
+- (Optional) **Docker** for local DB
 
-Stripe (PaymentIntents + webhooks)
+---
 
-JWT auth (bcrypt hashed passwords)
+## Project Structure (High Level)
 
-(Optional) Docker for local DB
-
-Project Structure (high level)
+```
 src/main/java/com/example/apibackend/
   ├─ auth/ (AuthController, JwtAuthFilter, JwtUtil, SecurityConfig)
   ├─ course/ (Course, CourseController, AdminCourseController, repositories, DTOs)
@@ -30,22 +32,25 @@ src/main/java/com/example/apibackend/
 src/main/resources/
   ├─ application.yml / application-*.yml
   ├─ db/schema (Flyway versioned migrations)
-  └─ db/seed-dev (dev‑only sample seed scripts)
+  └─ db/seed-dev (dev-only sample seed scripts)
+```
 
-Prerequisites
+---
 
-Java 17+
+## Prerequisites
 
-MySQL 8+ (or Docker)
+- **Java 17+**
+- **MySQL 8+** (or Docker)
+- **Stripe CLI** (for local webhooks)
+- (Optional) **curl / Postman** for testing
 
-Stripe CLI (for local webhooks)
+---
 
-(Optional) curl / Postman for testing
+## Environment Variables
 
-Environment Variables
+Create `src/main/resources/application.yml` (or use `application-dev.yml`) and supply secrets via environment variables:
 
-Create src/main/resources/application.yml (or use application-dev.yml) and supply secrets via env:
-
+```
 spring:
   datasource:
     url: jdbc:mysql://localhost:3306/learn_platform?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
@@ -67,129 +72,177 @@ app:
 stripe:
   secretKey: ${STRIPE_SECRET_KEY:sk_test_xxx}
   webhookSecret: ${STRIPE_WEBHOOK_SECRET:whsec_xxx}
+```
 
+**Tip (dev profile):** keep `db/seed-dev` enabled only when `spring.profiles.active=dev`.
 
-Tip (dev profile): keep db/seed-dev enabled only for spring.profiles.active=dev.
+---
 
-.env (shell) example
+### `.env` (shell) example
+
+```
 export DB_USER=root
 export DB_PASS=root
 export JWT_SECRET=dev_jwt_secret_change_me
 export STRIPE_SECRET_KEY=sk_test_123
 export STRIPE_WEBHOOK_SECRET=whsec_123
 export SPRING_PROFILES_ACTIVE=dev
+```
 
-Database Setup
-Option A: Local MySQL
+---
+
+## Database Setup
+
+### Option A: Local MySQL
+
+```
 CREATE DATABASE learn_platform CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER 'learn_user'@'%' IDENTIFIED BY 'learn_pass';
 GRANT ALL PRIVILEGES ON learn_platform.* TO 'learn_user'@'%';
 FLUSH PRIVILEGES;
+```
 
+Update `application.yml` datasource accordingly.
 
-Update application.yml datasource accordingly.
+---
 
-Option B: Docker MySQL
+### Option B: Docker MySQL
+
+```
 docker run --name mysql8-learn -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=learn_platform \
   -p 3306:3306 -d mysql:8
+```
 
-Build & Run
+---
+
+## Build & Run
+
+```
 ./mvnw clean spring-boot:run
 # or
 ./mvnw package && java -jar target/*.jar
+```
 
+The API should be up at:  
+**http://localhost:8080**
 
-The API should be up at http://localhost:8080.
+---
 
-Stripe Dev Workflow
+## Stripe Dev Workflow
 
-Start the API.
+1. Start the API
+2. Run Stripe CLI to forward events locally:
 
-Run Stripe CLI to forward events locally:
+   ```
+   stripe listen --forward-to http://localhost:8080/api/webhooks/payment
+   ```
 
-stripe listen --forward-to http://localhost:8080/api/webhooks/payment
-# copy the printed whsec_* into STRIPE_WEBHOOK_SECRET (dev)
+   Copy the printed `whsec_*` into `STRIPE_WEBHOOK_SECRET` (dev)
 
+3. Create PaymentIntents via:
+   - `POST /api/checkout` (single course)
+   - `POST /api/checkout/cart` (cart of courses)
 
-Create PaymentIntents via:
+4. Confirm a PaymentIntent (test card):
 
-POST /api/checkout (single course)
+   ```
+   stripe paymentintents confirm <pi_id> \
+     --payment-method pm_card_visa \
+     --return-url http://localhost:3000/stripe-return
+   ```
 
-POST /api/checkout/cart (cart of courses)
+5. Webhook marks `Payment.SUCCESS` and creates `Enrollment.ACTIVE` (idempotent).
+6. Verify via `GET /api/enrollments/me`.
 
-Confirm a PaymentIntent (test card):
+**Note:** For no-redirect dev flow, ensure you create PIs with  
+`automatic_payment_methods.allow_redirects=never` on the server.
 
-stripe paymentintents confirm <pi_id> \
-  --payment-method pm_card_visa \
-  --return-url http://localhost:3000/stripe-return
+---
 
+## Key Endpoints (Summary)
 
-Webhook marks Payment.SUCCESS and creates Enrollment.ACTIVE (idempotent).
+- **Auth:**  
+  `POST /api/auth/login` (JWT), `POST /api/auth/signup` (optional)
 
-Verify via GET /api/enrollments/me.
+- **Courses:**  
+  `GET /api/courses` (paged + filters: q, level, minRating, sort)  
+  `GET /api/courses/{slug}` (detail/TOC)
 
-For no redirects dev flow, ensure you created PIs with automatic_payment_methods.allow_redirects=never on the server.
+- **Cart:**  
+  `GET /api/cart`, `POST /api/cart/items {courseId}`, `DELETE /api/cart/items/{id}`
 
-Key Endpoints (summary)
+- **Payments:**  
+  `POST /api/checkout {courseId}`, `POST /api/checkout/cart` → returns clientSecrets  
+  Webhook: `POST /api/webhooks/payment`
 
-Auth: POST /api/auth/login (JWT), POST /api/auth/signup (optional)
+- **Enrollments:**  
+  `GET /api/enrollments/me`
 
-Courses: GET /api/courses (paged + filters: q, level, minRating, sort), GET /api/courses/{slug} (detail/TOC)
+- **Lessons (optional):**  
+  `GET /api/lessons/{lessonId}/playback-token` (gated, short-lived JWT)
 
-Cart: GET /api/cart, POST /api/cart/items {courseId}, DELETE /api/cart/items/{id}
+- **Reviews:**  
+  `POST /api/reviews`, `GET /api/courses/{slug}/reviews` (if exposed)
 
-Payments: POST /api/checkout {courseId}, POST /api/checkout/cart → returns clientSecrets; webhook: POST /api/webhooks/payment
+- **Admin:**  
+  CRUD for courses/modules/lessons, payments CSV export, refunds
 
-Enrollments: GET /api/enrollments/me
+---
 
-Lessons: (optional) GET /api/lessons/{lessonId}/playback-token (gated, short‑lived JWT)
+## Seeding Dev Data
 
-Reviews: POST /api/reviews, GET /api/courses/{slug}/reviews (if exposed)
+- Instructors & Courses:  
+  `db/seed-dev/VXX__seed_instructors_and_courses.sql`
+- Modules/Lessons (demos):  
+  `db/seed-dev/V__seed_modules_lessons_with_demos.sql`
+- Additional 13 Users/Instructors/Courses:  
+  `db/seed-dev/VXX__seed_13_users_instructors_courses.sql`
+- Reviews 2–20:  
+  `db/seed-dev/V__seed_reviews_courses_2_to_20.sql`
 
-Admin: CRUD for courses/modules/lessons, payments CSV export, refunds
+Seeds are **idempotent** (`WHERE NOT EXISTS`) and designed for dev environments.
 
-Seeding Dev Data
+---
 
-Instructors & Courses: db/seed-dev/VXX__seed_instructors_and_courses.sql (+ more seeds you added)
+## CORS & Dev Proxy
 
-Modules/Lessons (demos): db/seed-dev/V__seed_modules_lessons_with_demos.sql
+- **Option 1:** enable CORS for `http://localhost:5173` in `SecurityConfig` (dev only).  
+- **Option 2 (recommended):** use Vite dev proxy so the frontend calls `/api` without CORS.
 
-Additional 13 Users/Instructors/Courses: db/seed-dev/VXX__seed_13_users_instructors_courses.sql
+---
 
-Reviews 2–20: db/seed-dev/V__seed_reviews_courses_2_to_20.sql
+## Error Model
 
-Seeds are idempotent (WHERE NOT EXISTS) and designed for dev environments.
+Return structured errors like:
 
-CORS & Dev Proxy
+```
+{ 
+  "code": "PAYMENT_FAILED", 
+  "message": "Declined", 
+  "details": { "stripeCode": "card_declined" } 
+}
+```
 
-Either: enable CORS for http://localhost:5173 in SecurityConfig (dev only).
+---
 
-Or: use Vite dev proxy (recommended) so the frontend calls /api without CORS.
+## Security Notes
 
-Error Model
+- Verify Stripe webhook signatures
+- Use **idempotency** on both Stripe API calls and webhook processing (store processed `event.id`)
+- Never log full card data; avoid logging entire webhook payloads in prod
 
-Return structured errors:
+---
 
-{ "code": "PAYMENT_FAILED", "message": "Declined", "details": { "stripeCode": "card_declined" } }
+## Health
 
-Security Notes
+- Expose only `/actuator/health` publicly  
+- Lock down `/actuator/info` or disable
 
-Verify Stripe webhook signatures.
+---
 
-Use idempotency on both Stripe API calls and webhook processing (store processed event.id).
+## Deployment (Brief)
 
-Never log full card data; avoid logging entire webhook payloads in prod.
-
-Health
-
-Expose only /actuator/health publicly; lock down /actuator/info or disable.
-
-Deployment (brief)
-
-Prod DB: MySQL RDS or managed MySQL.
-
-App: Run as service on EC2; front with Nginx reverse proxy.
-
-Secrets: Environment variables or Parameter Store/Secrets Manager.
-
-CI/CD (future): Jenkins pipeline to build/test/deploy.
+- **Database:** MySQL RDS or managed MySQL  
+- **App:** Run as service on EC2; front with Nginx reverse proxy  
+- **Secrets:** Environment variables or AWS Parameter Store/Secrets Manager  
+- **CI/CD (future):** Jenkins pipeline to build/test/deploy
